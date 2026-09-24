@@ -2,7 +2,7 @@
 name: editorial-research
 description: Editorial research for technical publications. Collects and indexes an author's publication history, builds the cross-platform continuity map, runs dated public platform research (live for Habr) with transparent heuristic momentum, extracts abstract editorial patterns without copying content, and checks topic collision and saturated angles. Use when you need to know what the author already published, what is currently performing on a platform, or whether a topic is saturated.
 license: MIT
-compatibility: Needs the editorial-kit CLI (Node.js 20+). Live Habr research needs public internet access to habr.com; everything else works offline from cache and fixtures. No paid AI APIs.
+compatibility: Needs the editorial-kit CLI (Node.js 20.19+). Live Habr research needs public internet access to habr.com; everything else works offline from cache and fixtures. No paid AI APIs.
 metadata:
   version: "0.1.0"
   repository: "https://github.com/zinverno/storyops"

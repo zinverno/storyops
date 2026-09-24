@@ -33,7 +33,7 @@ function check(name: string, status: DoctorCheck['status'], message: string, hin
 export async function runDoctor(options: DoctorOptions): Promise<DoctorCheck[]> {
   const checks: DoctorCheck[] = [];
   const [major = 0, minor = 0] = process.versions.node.split('.').map(Number);
-  checks.push(major > 20 || (major === 20 && minor >= 10) ? check('node', 'ok', `Node.js ${process.versions.node}`) : check('node', 'fail', `Node.js ${process.versions.node} is too old`, 'Install Node.js 20.10 or newer.'));
+  checks.push(major > 20 || (major === 20 && minor >= 19) ? check('node', 'ok', `Node.js ${process.versions.node}`) : check('node', 'fail', `Node.js ${process.versions.node} is too old`, 'Install Node.js 20.19 or newer (22 LTS recommended).'));
 
   const workspace = resolveWorkspace(options.root, options.configFile ? { configFile: options.configFile } : {});
   let config: EditorialConfig | undefined;

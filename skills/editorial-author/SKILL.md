@@ -2,7 +2,7 @@
 name: editorial-author
 description: Turns the real history of a software project into evidence-backed technical publications (Habr, Medium, LinkedIn, Telegram, personal blogs). Builds a platform-independent canonical story from author memory, publication continuity, repository evidence and narrative gaps, then adapts it per platform strategy and fact-checks it. Use when the user wants to write, plan, continue or repurpose an article, post or series about their own project.
 license: MIT
-compatibility: Needs the editorial-kit CLI (Node.js 20+, git) from the storyops repository. Live research needs public internet access; screenshots need Playwright + Chromium. No paid AI APIs required.
+compatibility: Needs the editorial-kit CLI (Node.js 20.19+, git) from the storyops repository. Live research needs public internet access; screenshots need Playwright + Chromium. No paid AI APIs required.
 metadata:
   version: "0.1.0"
   repository: "https://github.com/zinverno/storyops"

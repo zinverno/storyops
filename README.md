@@ -64,7 +64,7 @@ density, structure, length), never the topic or the facts.
 
 ## Installation
 
-Requirements: Node.js ≥ 20.10, npm, git. Chromium for screenshots.
+Requirements: Node.js ≥ 20.19 (Node 20 and 22 are tested in CI), npm, git. Chromium for screenshots.
 
 ```bash
 git clone https://github.com/zinverno/storyops.git

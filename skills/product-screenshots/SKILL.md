@@ -2,7 +2,7 @@
 name: product-screenshots
 description: Plans and captures consistent, privacy-safe product screenshots with Playwright for technical articles. Derives a screenshot plan from the canonical story (each shot has a narrative purpose), starts the local app, navigates to the exact UI state, masks private data, blocks captures whose DOM text or form values look like secrets (pixels are not scanned, so every image needs visual review), and stores canonical originals that are never overwritten. Use when an article or post needs real screenshots of a web product.
 license: MIT
-compatibility: Needs the editorial-kit CLI, Node.js 20+, Playwright and a Chromium build (npx playwright install chromium, or EDITORIAL_CHROMIUM_PATH). Web targets are supported; Electron capture is experimental and untested.
+compatibility: Needs the editorial-kit CLI, Node.js 20.19+, Playwright and a Chromium build (npx playwright install chromium, or EDITORIAL_CHROMIUM_PATH). Web targets are supported; Electron capture is experimental and untested.
 metadata:
   version: "0.1.0"
   repository: "https://github.com/zinverno/storyops"
