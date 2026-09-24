@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "slug": "notegarden-health-model",
+  "status": "draft",
+  "language": "ru",
+  "topic": "Notegarden: от разового аудита к постоянной модели здоровья",
+  "project": "notegarden",
+  "createdAt": "2026-09-24T12:00:00.000Z",
+  "updatedAt": "2026-09-24T12:00:00.000Z",
+  "context": "Notegarden проверяет хранилище заметок Obsidian: битые ссылки, заметки-сироты, пустые заметки. Первая версия была разовым аудитом без состояния.",
+  "previousState": "В статье «Как устроен Notegarden: разовый аудит заметок изнутри» аудит строил индекс заново при каждом запуске, находки не имели статуса и истории, отчёт перезаписывался.",
+  "problem": "Разовый аудит не отличал новую находку от уже увиденной и оставленной сознательно и не показывал, становится ли хранилище лучше или хуже со временем.",
+  "constraints": [
+    "Хранилище живёт в обычных markdown-файлах; Notegarden не должен менять заметки.",
+    "Хранение должно быть локальным, без сервера."
+  ],
+  "turningPoint": "Решение зафиксировано в ADR-0003: заменить разовый аудит постоянной моделью здоровья с жизненным циклом находок.",
+  "solution": "Находки хранятся в SQLite и проходят состояния open → acknowledged → resolved; модель здоровья пересчитывает оценку только для изменившихся папок; аудит превратился в инкрементальный конвейер анализа, а разовый раннер удалён.",
+  "technicalDecisions": [
+    {
+      "decision": "Жизненный цикл находок с явными допустимыми переходами",
+      "why": "Подтверждённые находки не должны всплывать в каждом отчёте, пока заметка не изменилась.",
+      "alternatives": ["Список игнорирования в конфигурации"],
+      "evidence": ["src/findings/lifecycle.ts", "tests/findings/lifecycle.test.ts"]
+    },
+    {
+      "decision": "Оценка здоровья по папкам с инкрементальным пересчётом",
+      "why": "Полный пересчёт при каждом запуске повторял бы главный недостаток разового аудита.",
+      "alternatives": [],
+      "evidence": ["src/health/model.ts", "src/health/score.ts", "tests/health/model.test.ts"]
+    },
+    {
+      "decision": "SQLite вместо JSON-файлов отчётов",
+      "why": "Нужна история находок между запусками.",
+      "alternatives": ["Файлы рядом с заметками"],
+      "evidence": ["src/storage/sqlite.ts", "src/storage/migrations/001-initial.sql", "docs/adr/0003-persistent-health-model.md"]
+    }
+  ],
+  "failedOrInsufficientApproaches": [
+    {
+      "approach": "Разовый аудит, который каждый раз прогоняет все правила по всему хранилищу",
+      "whyInsufficient": "Не хранит историю и не отличает новые находки от уже увиденных (раздел Context в ADR-0003).",
+      "evidence": ["docs/adr/0003-persistent-health-model.md", "publication:habr:900002"]
+    }
+  ],
+  "evidence": ["docs/ARCHITECTURE.md", "docs/adr/0003-persistent-health-model.md", "CHANGELOG.md", "tag:v0.2.0", "src/knowledge/", "src/analysis/pipeline.ts"],
+  "measurements": [],
+  "results": [
+    { "text": "Версия 0.2.0 вышла с моделью здоровья, жизненным циклом находок, анализом знаний и хранением в SQLite.", "evidence": ["CHANGELOG.md", "tag:v0.2.0"] }
+  ],
+  "limitations": [
+    "Хранилище рассчитано на один процесс: два анализа одного хранилища одновременно не поддерживаются (ADR-0003, Consequences).",
+    "Замеров производительности инкрементального пересчёта пока нет."
+  ],
+  "openQuestions": ["Как показывать динамику оценки здоровья в отчёте, чтобы она не превращалась в шум?"],
+  "relationToPreviousPublications": [],
+  "narrativeGap": "Архитектура, описанная на Хабре (разовый аудит), больше не актуальна; модель здоровья, жизненный цикл находок и анализ знаний ещё не разбирались.",
+  "possibleVisuals": [
+    { "id": "architecture-before-after", "kind": "diagram", "description": "Разовый аудит (раннер → правила → отчёт) против конвейера анализа с хранилищем и моделью здоровья", "purpose": "Показать, что изменилось относительно уже знакомой читателям архитектуры.", "supports": "design" },
+    { "id": "finding-lifecycle", "kind": "code", "description": "Таблица допустимых переходов из src/findings/lifecycle.ts", "purpose": "Показать жизненный цикл находки на реальном коде.", "supports": "implementation" }
+  ],
+  "claims": [
+    { "id": "lifecycle-states", "text": "Находка проходит состояния open, acknowledged и resolved; resolved нельзя сразу перевести в acknowledged.", "classification": "verified-fact", "evidence": ["src/findings/lifecycle.ts", "tests/findings/lifecycle.test.ts"] },
+    { "id": "one-off-audit-removed", "text": "Разовый раннер аудита удалён из репозитория.", "classification": "verified-fact", "evidence": ["CHANGELOG.md", "src/index.ts"] },
+    { "id": "sqlite-store", "text": "Находки хранятся в SQLite, схема создаётся миграцией.", "classification": "verified-fact", "evidence": ["src/storage/migrations/001-initial.sql", "docs/adr/0003-persistent-health-model.md"] },
+    { "id": "better-maintenance", "text": "Постоянная модель удобнее для регулярного ухода за хранилищем, чем разовый аудит.", "classification": "interpretation", "evidence": [] },
+    { "id": "trend-view", "text": "В отчёте появится график динамики оценки здоровья.", "classification": "future-plan", "evidence": [] }
+  ],
+  "provenance": [],
+  "pending": [],
+  "outputs": []
+}

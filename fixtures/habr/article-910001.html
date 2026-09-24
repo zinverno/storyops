@@ -1,0 +1,30 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Почему наш планировщик задач терял события по ночам: разбор / Хабр</title>
+<script type="application/ld+json">{"@context": "http://schema.org", "@type": "Article", "headline": "Почему наш планировщик задач терял события по ночам: разбор", "datePublished": "2026-09-22T09:00:00.000Z", "author": {"@type": "Person", "name": "fixture_author_a"}}</script></head>
+<body><div class="tm-layout"><main><div class="tm-article-presenter">
+<div class="tm-article-presenter__header">
+  <span class="tm-user-info__user"><a href="/ru/users/fixture_author_a/" class="tm-user-info__username">fixture_author_a</a></span>
+  <span class="tm-article-datetime-published"><time datetime="2026-09-22T09:00:00.000Z" title="">позавчера в 12:00</time></span>
+  <span class="tm-icon-counter" title="Количество просмотров"><span class="tm-icon-counter__value">18K</span></span>
+  <h1 class="tm-title tm-title_h1" lang="ru" data-test-id="articleTitle"><span>Почему наш планировщик задач терял события по ночам: разбор</span></h1>
+</div>
+<div class="tm-article-presenter__body"><div class="tm-article-body"><div id="post-content-body"><div><div class="article-formatted-body article-formatted-body_version-2"><div xmlns="http://www.w3.org/1999/xhtml">
+<p>Три недели подряд планировщик задач терял часть событий между двумя и четырьмя часами ночи. Ошибок в логах не было, метрики очереди выглядели нормально, но утром пользователи находили незапущенные задачи.</p>
+<h2>Как мы искали проблему</h2>
+<p>Сначала подозревали брокер. Потом выяснилось, что в это окно срабатывает перенос партиций, и воркер подтверждал сообщение до записи результата.</p>
+<pre><code class="go">msg.Ack()
+if err := store.Save(result); err != nil {
+    return err
+}</code></pre>
+<p>После переноса подтверждения за запись потери исчезли: за 14 дней наблюдения 0 потерянных событий против 30–40 в сутки раньше.</p>
+<h2>Почему это не ловили тесты</h2>
+<p>Интеграционные тесты не перезапускали брокер посреди обработки.</p>
+<figure class="full-width"><img src="https://habrastorage.org/fixture/scheduler-diagram.png" alt="Схема обработки событий" width="800" height="400"><figcaption>Схема до и после исправления</figcaption></figure>
+<h2>Что дальше</h2>
+<p>Добавим хаос-тест на перенос партиций в CI.</p>
+</div></div></div></div></div></div>
+<div class="tm-article-presenter__meta">
+  <div class="tm-separated-list tm-article-presenter__meta-list"><span class="tm-separated-list__title">Теги:</span><ul class="tm-separated-list__list"><li class="tm-separated-list__item"><a href="/ru/search/?target_type=posts&amp;order=relevance&amp;q=%5Bразработка%5D" class="tm-tags-list__link"><span>разработка</span></a></li></ul></div>
+  <div class="tm-separated-list tm-article-presenter__meta-list"><span class="tm-separated-list__title">Хабы:</span><ul class="tm-separated-list__list"><li class="tm-separated-list__item"><a href="/ru/hubs/programming/" class="tm-hubs-list__link"><span>Программирование</span></a></li><li class="tm-separated-list__item"><a href="/ru/hubs/go/" class="tm-hubs-list__link"><span>Go</span></a></li></ul></div>
+</div>
+<div class="tm-article-presenter__footer"><div class="tm-data-icons"><span title="Всего голосов 70: ↑67 и ↓3" class="tm-votes-meter__value tm-votes-meter__value_rating">+64</span><span class="bookmarks-button__counter">140</span><span class="tm-article-comments-counter-link__value">Комментарии 58</span></div></div>
+</div></main></div></body></html>

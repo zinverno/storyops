@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Notegarden — health (fixture)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #f6f7f9; color: #1d2330; }
+    header { background: #24324a; color: #fff; padding: 16px 24px; }
+    main { padding: 24px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    .score { font-size: 40px; font-weight: 700; }
+    #debug-panel { position: fixed; bottom: 0; right: 0; background: #c00; color: #fff; padding: 8px; }
+    .loading main { opacity: .2; }
+  </style>
+</head>
+<body class="loading">
+  <header>Notegarden · Vault health <span class="user-email">fixture-user@example.invalid</span></header>
+  <main id="dashboard">
+    <section class="card"><h2>Inbox</h2><div class="score">72</div><p>5 open findings</p></section>
+    <section class="card"><h2>Projects</h2><div class="score">91</div><p>1 open finding</p></section>
+    <section class="card"><h2>Archive</h2><div class="score">100</div><p>No open findings</p></section>
+  </main>
+  <div id="debug-panel">DEBUG build 0.0.0-dev</div>
+  <script>
+    // Data "loads" asynchronously, so a capture without a ready-state wait would show the loading state.
+    setTimeout(() => {
+      document.body.classList.remove('loading');
+      document.getElementById('dashboard').setAttribute('data-ready', 'true');
+    }, 300);
+  </script>
+</body>
+</html>

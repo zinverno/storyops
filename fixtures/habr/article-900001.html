@@ -1,0 +1,30 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Notegarden: зачем я написал аудитор для заметок Obsidian / Хабр</title>
+<script type="application/ld+json">{"@context": "http://schema.org", "@type": "Article", "headline": "Notegarden: зачем я написал аудитор для заметок Obsidian", "datePublished": "2025-02-03T09:00:00.000Z", "author": {"@type": "Person", "name": "demo_author"}}</script></head>
+<body><div class="tm-layout"><main><div class="tm-article-presenter">
+<div class="tm-article-presenter__header">
+  <span class="tm-user-info__user"><a href="/ru/users/demo_author/" class="tm-user-info__username">demo_author</a></span>
+  <span class="tm-article-datetime-published"><time datetime="2025-02-03T09:00:00.000Z" title="">3 фев 2025 в 12:00</time></span>
+  <span class="tm-icon-counter" title="Количество просмотров"><span class="tm-icon-counter__value">4.2K</span></span>
+  <h1 class="tm-title tm-title_h1" lang="ru" data-test-id="articleTitle"><span>Notegarden: зачем я написал аудитор для заметок Obsidian</span></h1>
+</div>
+<div class="tm-article-presenter__body"><div class="tm-article-body"><div id="post-content-body"><div><div class="article-formatted-body article-formatted-body_version-2"><div xmlns="http://www.w3.org/1999/xhtml">
+<p>За три года моё хранилище заметок в Obsidian выросло до четырёх тысяч файлов. Часть ссылок давно никуда не ведёт, часть заметок ни с чем не связана, а теги живут своей жизнью. Руками такое не проверишь, поэтому я написал Notegarden: небольшую утилиту, которая проходит по хранилищу и показывает, где оно запущено.</p>
+<h2>Откуда взялась проблема</h2>
+<p>Obsidian хорошо помогает писать, но почти не помогает поддерживать порядок. Битую ссылку видно только тогда, когда по ней кликнешь. Заметку-сироту, на которую никто не ссылается, не видно вообще. Когда заметок сотни, это терпимо. Когда тысячи, хранилище постепенно превращается в свалку, в которой страшно что-то искать.</p>
+<p>Готовые плагины решали отдельные куски: один искал битые ссылки, другой показывал граф. Мне хотелось одного отчёта, который можно запустить из терминала и приложить к коммиту в репозиторий с заметками.</p>
+<h2>Что умеет первая версия</h2>
+<p>Первая версия Notegarden делает разовый аудит. Она читает все markdown-файлы, прогоняет по ним набор правил и собирает отчёт. Правила пока простые:</p>
+<ul><li>битые вики-ссылки и ссылки на несуществующие вложения;</li><li>заметки-сироты без входящих ссылок;</li><li>пустые заметки и заметки только с заголовком;</li><li>теги, которые встречаются ровно один раз.</li></ul>
+<p>Отчёт получается в markdown, поэтому его удобно читать прямо в Obsidian.</p>
+<h2>Как запустить</h2>
+<pre><code class="bash">npx notegarden audit ~/Notes --report notegarden-report.md</code></pre>
+<p>Аудит моего хранилища занимает около двадцати секунд на ноутбуке, но это не бенчмарк, а просто ощущение от запуска.</p>
+<h2>Что дальше</h2>
+<p>В следующей статье расскажу, как устроен аудит внутри: раннер, правила и отчёт. Там же покажу, почему правила оказались удобнее, чем один большой скрипт.</p>
+</div></div></div></div></div></div>
+<div class="tm-article-presenter__meta">
+  <div class="tm-separated-list tm-article-presenter__meta-list"><span class="tm-separated-list__title">Теги:</span><ul class="tm-separated-list__list"><li class="tm-separated-list__item"><a href="/ru/search/?target_type=posts&amp;order=relevance&amp;q=%5Bobsidian%5D" class="tm-tags-list__link"><span>obsidian</span></a></li><li class="tm-separated-list__item"><a href="/ru/search/?target_type=posts&amp;order=relevance&amp;q=%5Bзаметки%5D" class="tm-tags-list__link"><span>заметки</span></a></li><li class="tm-separated-list__item"><a href="/ru/search/?target_type=posts&amp;order=relevance&amp;q=%5Btypescript%5D" class="tm-tags-list__link"><span>typescript</span></a></li></ul></div>
+  <div class="tm-separated-list tm-article-presenter__meta-list"><span class="tm-separated-list__title">Хабы:</span><ul class="tm-separated-list__list"><li class="tm-separated-list__item"><a href="/ru/hubs/open_source/" class="tm-hubs-list__link"><span>Open source</span></a></li><li class="tm-separated-list__item"><a href="/ru/hubs/programming/" class="tm-hubs-list__link"><span>Программирование</span></a></li></ul></div>
+</div>
+<div class="tm-article-presenter__footer"><div class="tm-data-icons"><span title="Всего голосов 28: ↑26 и ↓2" class="tm-votes-meter__value tm-votes-meter__value_rating">+24</span><span class="bookmarks-button__counter">37</span><span class="tm-article-comments-counter-link__value">Комментарии 15</span></div></div>
+</div></main></div></body></html>
