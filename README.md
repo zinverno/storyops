@@ -92,21 +92,23 @@ Skill folders are self-contained; copy or link them where your client looks for 
 
 | Client | Project scope | User (global) scope | Source |
 | --- | --- | --- | --- |
-| Claude Code | `.claude/skills/<name>/` | `~/.claude/skills/<name>/` | [Claude Code skills docs](https://code.claude.com/docs/en/skills) |
-| Codex | `.agents/skills/<name>/` | `~/.agents/skills/<name>/` | [Codex skills docs](https://developers.openai.com/codex/skills) ¹ |
+| Claude Code | `<project>/.claude/skills/<name>/` | `~/.claude/skills/<name>/` | [Claude Code skills docs](https://code.claude.com/docs/en/skills) |
+| Codex | `<project>/.agents/skills/<name>/` | `$CODEX_HOME/skills/<name>/` (default `~/.codex/skills/<name>/`) | [Codex skills docs](https://developers.openai.com/codex/skills) ¹ |
 | Other clients | see the client's docs | | use `--target` |
 
 ¹ The Codex docs page could not be fetched from the environment where this
-repository was built; the paths were taken from secondary sources that quote it.
-Check them against the current docs. The `skill-installer` skill in
-[openai/skills](https://github.com/openai/skills) installs into `$CODEX_HOME/skills`
-(default `~/.codex/skills`).
+repository was built. The user location follows `CODEX_HOME` (default
+`~/.codex`), which is also where the `skill-installer` skill in
+[openai/skills](https://github.com/openai/skills) installs (`$CODEX_HOME/skills`);
+the repository-local `.agents/skills` location comes from secondary sources
+quoting the docs. Check both against the current OpenAI docs.
 
 ```bash
 editorial-kit skills install --agent claude                 # → ./.claude/skills
 editorial-kit skills install --agent claude --scope user    # → ~/.claude/skills
 editorial-kit skills install --agent codex                  # → ./.agents/skills
-editorial-kit skills install --target /any/skills/dir --link   # symlink instead of copy
+editorial-kit skills install --agent codex --scope user     # → $CODEX_HOME/skills, default ~/.codex/skills
+editorial-kit skills install --target /any/skills/dir --link   # explicit target wins; symlink instead of copy
 ```
 
 Nothing is installed implicitly; the command refuses to overwrite existing

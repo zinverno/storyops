@@ -12,7 +12,7 @@ import { EditorialError, errorMessage } from '../shared/errors.js';
 import { readJson } from '../shared/fs.js';
 import { createLogger, type Logger, type LogLevel } from '../shared/logger.js';
 import { resolveWorkspace } from '../shared/workspace.js';
-import { installSkills, skillTargetDir } from '../skills/install.js';
+import { installSkills, resolveInstallTarget, type SkillAgent, type SkillScope } from '../skills/install.js';
 import { validateSkillsDir } from '../skills/validate.js';
 import { loadStory } from '../stories/store.js';
 import { validateStory } from '../stories/validate.js';
@@ -414,15 +414,18 @@ skills
   });
 skills
   .command('install')
-  .description('copy (or link) the bundled skills into a skills directory. Explicit target required; nothing is installed implicitly.')
+  .description(
+    'copy (or link) the bundled skills into a skills directory. Explicit destination required; nothing is installed implicitly.\n' +
+      'Destinations: claude project → <cwd>/.claude/skills, claude user → ~/.claude/skills,\n' +
+      'codex project → <cwd>/.agents/skills, codex user → $CODEX_HOME/skills (default ~/.codex/skills).',
+  )
   .addOption(new Option('--agent <agent>', 'use the documented location for this client').choices(['claude', 'codex']))
-  .addOption(new Option('--scope <scope>', 'project (current workspace) or user (home directory)').choices(['project', 'user']).default('project'))
+  .addOption(new Option('--scope <scope>', 'project (current workspace) or user (home / $CODEX_HOME)').choices(['project', 'user']).default('project'))
   .option('--target <dir>', 'explicit target directory (overrides --agent/--scope)')
   .option('--link', 'symlink instead of copying (keeps skills in sync with this checkout)')
   .option('--force', 'replace existing skills with the same name')
-  .action(async (o: { agent?: 'claude' | 'codex'; scope: 'project' | 'user'; target?: string; link?: boolean; force?: boolean }) => {
-    if (!o.target && !o.agent) throw new EditorialError('SKILLS_TARGET', 'Choose where to install: --agent claude|codex [--scope project|user] or --target <dir>');
-    const target = o.target ? path.resolve(o.target) : skillTargetDir(o.agent!, o.scope, root());
+  .action(async (o: { agent?: SkillAgent; scope: SkillScope; target?: string; link?: boolean; force?: boolean }) => {
+    const target = resolveInstallTarget({ projectRoot: root(), scope: o.scope, ...(o.agent ? { agent: o.agent } : {}), ...(o.target ? { target: o.target } : {}) });
     const r = await installSkills(path.join(packageRoot(), 'skills'), target, { ...(o.link ? { link: true } : {}), ...(o.force ? { force: true } : {}) });
     out(r, [`Target: ${r.target}`, ...r.installed.map((s) => `installed ${s}`), ...r.skipped.map((s) => `skipped ${s.skill}: ${s.reason}`)]);
   });
