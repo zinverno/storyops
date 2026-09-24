@@ -1,0 +1,26 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Как мы сократили время сборки монорепозитория с 40 до 7 минут / Хабр</title>
+<script type="application/ld+json">{"@context": "http://schema.org", "@type": "Article", "headline": "Как мы сократили время сборки монорепозитория с 40 до 7 минут", "datePublished": "2026-09-20T10:00:00.000Z", "author": {"@type": "Person", "name": "fixture_author_d"}}</script></head>
+<body><div class="tm-layout"><main><div class="tm-article-presenter">
+<div class="tm-article-presenter__header">
+  <span class="tm-user-info__user"><a href="/ru/users/fixture_author_d/" class="tm-user-info__username">fixture_author_d</a></span>
+  <span class="tm-article-datetime-published"><time datetime="2026-09-20T10:00:00.000Z" title="">20 сен в 13:00</time></span>
+  <span class="tm-icon-counter" title="Количество просмотров"><span class="tm-icon-counter__value">12K</span></span>
+  <h1 class="tm-title tm-title_h1" lang="ru" data-test-id="articleTitle"><span>Как мы сократили время сборки монорепозитория с 40 до 7 минут</span></h1>
+</div>
+<div class="tm-article-presenter__body"><div class="tm-article-body"><div id="post-content-body"><div><div class="article-formatted-body article-formatted-body_version-2"><div xmlns="http://www.w3.org/1999/xhtml">
+<p>Сборка монорепозитория занимала 40 минут, и разработчики перестали запускать её локально. Это стало главной проблемой команды.</p>
+<h2>Где уходило время</h2>
+<p>Около 60% времени занимала повторная установка зависимостей в каждом пакете.</p>
+<pre><code class="yaml">cache:
+  key: deps-{{ checksum &quot;package-lock.json&quot; }}</code></pre>
+<h2>Что изменили</h2>
+<p>Общий кэш зависимостей и инкрементальная сборка сократили время до 7 минут.</p>
+<h2>Что дальше</h2>
+<p>Следующий шаг: удалённый кэш артефактов.</p>
+</div></div></div></div></div></div>
+<div class="tm-article-presenter__meta">
+  <div class="tm-separated-list tm-article-presenter__meta-list"><span class="tm-separated-list__title">Теги:</span><ul class="tm-separated-list__list"><li class="tm-separated-list__item"><a href="/ru/search/?target_type=posts&amp;order=relevance&amp;q=%5Bразработка%5D" class="tm-tags-list__link"><span>разработка</span></a></li></ul></div>
+  <div class="tm-separated-list tm-article-presenter__meta-list"><span class="tm-separated-list__title">Хабы:</span><ul class="tm-separated-list__list"><li class="tm-separated-list__item"><a href="/ru/hubs/devops/" class="tm-hubs-list__link"><span>DevOps</span></a></li><li class="tm-separated-list__item"><a href="/ru/hubs/programming/" class="tm-hubs-list__link"><span>Программирование</span></a></li></ul></div>
+</div>
+<div class="tm-article-presenter__footer"><div class="tm-data-icons"><span title="Всего голосов 41: ↑38 и ↓3" class="tm-votes-meter__value tm-votes-meter__value_rating">+35</span><span class="bookmarks-button__counter">150</span><span class="tm-article-comments-counter-link__value">Комментарии 30</span></div></div>
+</div></main></div></body></html>

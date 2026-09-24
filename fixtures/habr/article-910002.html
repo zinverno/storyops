@@ -1,0 +1,26 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Мы перенесли поиск с Elasticsearch на PostgreSQL и упёрлись в блокировки / Хабр</title>
+<script type="application/ld+json">{"@context": "http://schema.org", "@type": "Article", "headline": "Мы перенесли поиск с Elasticsearch на PostgreSQL и упёрлись в блокировки", "datePublished": "2026-09-21T07:00:00.000Z", "author": {"@type": "Person", "name": "fixture_author_b"}}</script></head>
+<body><div class="tm-layout"><main><div class="tm-article-presenter">
+<div class="tm-article-presenter__header">
+  <span class="tm-user-info__user"><a href="/ru/users/fixture_author_b/" class="tm-user-info__username">fixture_author_b</a></span>
+  <span class="tm-article-datetime-published"><time datetime="2026-09-21T07:00:00.000Z" title="">21 сен в 10:00</time></span>
+  <span class="tm-icon-counter" title="Количество просмотров"><span class="tm-icon-counter__value">14K</span></span>
+  <h1 class="tm-title tm-title_h1" lang="ru" data-test-id="articleTitle"><span>Мы перенесли поиск с Elasticsearch на PostgreSQL и упёрлись в блокировки</span></h1>
+</div>
+<div class="tm-article-presenter__body"><div class="tm-article-body"><div id="post-content-body"><div><div class="article-formatted-body article-formatted-body_version-2"><div xmlns="http://www.w3.org/1999/xhtml">
+<p>Мы перенесли полнотекстовый поиск с Elasticsearch на PostgreSQL, чтобы убрать отдельный кластер. Через неделю после переключения запросы на запись начали ждать блокировок по несколько секунд.</p>
+<h2>Как было</h2>
+<p>Индекс обновлялся асинхронно отдельным сервисом.</p>
+<h2>Как стало</h2>
+<p>Триггер обновлял tsvector в той же транзакции, что и основная запись, и держал блокировку строки дольше.</p>
+<pre><code class="sql">CREATE INDEX CONCURRENTLY idx_docs_search ON docs USING gin (search);</code></pre>
+<p>После выноса обновления в очередь p95 записи вернулся к 40 ms.</p>
+<h2>Итоги</h2>
+<p>Перенос оправдал себя, но только после изменения схемы обновления.</p>
+</div></div></div></div></div></div>
+<div class="tm-article-presenter__meta">
+  <div class="tm-separated-list tm-article-presenter__meta-list"><span class="tm-separated-list__title">Теги:</span><ul class="tm-separated-list__list"><li class="tm-separated-list__item"><a href="/ru/search/?target_type=posts&amp;order=relevance&amp;q=%5Bразработка%5D" class="tm-tags-list__link"><span>разработка</span></a></li></ul></div>
+  <div class="tm-separated-list tm-article-presenter__meta-list"><span class="tm-separated-list__title">Хабы:</span><ul class="tm-separated-list__list"><li class="tm-separated-list__item"><a href="/ru/hubs/postgresql/" class="tm-hubs-list__link"><span>PostgreSQL</span></a></li><li class="tm-separated-list__item"><a href="/ru/hubs/programming/" class="tm-hubs-list__link"><span>Программирование</span></a></li></ul></div>
+</div>
+<div class="tm-article-presenter__footer"><div class="tm-data-icons"><span title="Всего голосов 56: ↑52 и ↓4" class="tm-votes-meter__value tm-votes-meter__value_rating">+48</span><span class="bookmarks-button__counter">120</span><span class="tm-article-comments-counter-link__value">Комментарии 41</span></div></div>
+</div></main></div></body></html>

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "target": { "kind": "web" },
+  "baseUrl": "http://localhost:3000",
+  "launch": {
+    "command": "npm",
+    "args": ["run", "dev"],
+    "cwd": "../../my-project",
+    "readyUrl": "http://localhost:3000/health",
+    "readyTimeoutMs": 60000
+  },
+  "viewport": { "width": 1440, "height": 1000 },
+  "privacy": {
+    "blockOnSecrets": true,
+    "allowEmails": false,
+    "mask": ["[data-private]", ".user-email"],
+    "hide": ["#debug-panel", ".dev-toolbar"]
+  },
+  "steps": [
+    {
+      "name": "dashboard",
+      "path": "/",
+      "waitFor": "[data-ready=true]",
+      "screenshot": "01-dashboard.png",
+      "purpose": "Show the reader the primary user-facing entry point.",
+      "supports": "Section describing the new health overview."
+    },
+    {
+      "name": "finding-details",
+      "path": "/findings/demo",
+      "waitFor": "[data-loaded=true]",
+      "screenshot": "02-finding.png",
+      "clip": "main",
+      "purpose": "Show evidence/explainability of a single finding.",
+      "supports": "Section explaining why the new lifecycle matters."
+    }
+  ]
+}

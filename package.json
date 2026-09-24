@@ -1,0 +1,57 @@
+{
+  "name": "storyops",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "commander": "^14.0.3",
+    "playwright": "^1.63.0",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.2",
+    "eslint": "^10.11.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.1",
+    "vitest": "^4.1.11"
+  },
+  "description": "Evidence-backed editorial system for turning real software project history into platform-specific technical publications. Agent Skills + CLI.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "bin": {
+    "editorial-kit": "dist/src/cli/index.js"
+  },
+  "files": [
+    "dist/src",
+    "dist/platforms",
+    "skills",
+    "platforms/**/README.md",
+    "examples",
+    "fixtures",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run lint && npm run typecheck && npm run build && npm test && node dist/src/cli/index.js skills validate",
+    "editorial-kit": "node dist/src/cli/index.js"
+  },
+  "keywords": [
+    "agent-skills",
+    "editorial",
+    "technical-writing",
+    "habr",
+    "playwright",
+    "claude-code",
+    "codex"
+  ]
+}

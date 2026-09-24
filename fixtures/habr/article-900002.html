@@ -1,0 +1,40 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Как устроен Notegarden: разовый аудит заметок изнутри / Хабр</title>
+<script type="application/ld+json">{"@context": "http://schema.org", "@type": "Article", "headline": "Как устроен Notegarden: разовый аудит заметок изнутри", "datePublished": "2025-03-10T09:00:00.000Z", "author": {"@type": "Person", "name": "demo_author"}}</script></head>
+<body><div class="tm-layout"><main><div class="tm-article-presenter">
+<div class="tm-article-presenter__header">
+  <span class="tm-user-info__user"><a href="/ru/users/demo_author/" class="tm-user-info__username">demo_author</a></span>
+  <span class="tm-article-datetime-published"><time datetime="2025-03-10T09:00:00.000Z" title="">10 мар 2025 в 12:00</time></span>
+  <span class="tm-icon-counter" title="Количество просмотров"><span class="tm-icon-counter__value">5.8K</span></span>
+  <h1 class="tm-title tm-title_h1" lang="ru" data-test-id="articleTitle"><span>Как устроен Notegarden: разовый аудит заметок изнутри</span></h1>
+</div>
+<div class="tm-article-presenter__body"><div class="tm-article-body"><div id="post-content-body"><div><div class="article-formatted-body article-formatted-body_version-2"><div xmlns="http://www.w3.org/1999/xhtml">
+<p>В прошлой статье я рассказал, зачем мне понадобился Notegarden. Теперь про то, как он устроен. Архитектура у первой версии намеренно простая: аудит запускается один раз, проходит по всему хранилищу и выдаёт отчёт. Никакого состояния между запусками нет.</p>
+<h2>Архитектура аудита</h2>
+<p>Аудит состоит из трёх частей. Раннер в <code>src/audit/runner.ts</code> обходит хранилище и строит индекс заметок. Правила в <code>src/audit/rules.ts</code> получают индекс и возвращают находки. Модуль отчёта в <code>src/report/markdown.ts</code> превращает находки в markdown.</p>
+<pre><code class="typescript">export async function runAudit(vault: string): Promise&lt;Finding[]&gt; {
+  const index = await buildIndex(vault);
+  return rules.flatMap((rule) =&gt; rule.check(index));
+}</code></pre>
+<p>Индекс хранит для каждой заметки путь, заголовки, исходящие ссылки и теги. Входящие ссылки считаются вторым проходом, когда все заметки уже прочитаны. Индекс строится заново при каждом запуске аудита, и это главное упрощение первой версии.</p>
+<h2>Правила</h2>
+<p>Каждое правило — это объект с идентификатором, описанием и функцией <code>check</code>. Правило ничего не знает про файловую систему: оно получает готовый индекс и возвращает список находок. Благодаря этому правила легко тестировать на маленьких синтетических индексах, без реального хранилища.</p>
+<pre><code class="typescript">export const orphanNotes: Rule = {
+  id: &#x27;orphan-note&#x27;,
+  check: (index) =&gt; index.notes.filter((n) =&gt; n.incoming.length === 0).map(toFinding),
+};</code></pre>
+<p>Находка в первой версии — это просто запись: правило, заметка, сообщение. У находки нет истории и нет статуса. Если запустить аудит завтра, он найдёт те же самые проблемы и не будет знать, что вчера они уже были.</p>
+<h2>Отчёт</h2>
+<p>Отчёт группирует находки по правилам и сортирует по количеству. Сверху идёт сводка, дальше списки со ссылками на заметки. Так как ссылки в формате вики, по ним можно кликать прямо в Obsidian и сразу исправлять.</p>
+<p>Отчёт перезаписывается при каждом запуске. Сравнить два отчёта можно только через diff в git, и это неудобно: порядок строк меняется, если в хранилище добавилась хотя бы одна заметка.</p>
+<h2>Почему аудит разовый</h2>
+<p>Разовый аудит было проще всего написать и проверить. Я хотел сначала понять, какие правила вообще полезны, и не тратить время на хранение состояния. Для хранилища на четыре тысячи заметок полный проход укладывается в секунды, поэтому инкрементальность казалась преждевременной оптимизацией.</p>
+<p>Но у этого решения есть цена. Аудит не помнит, какие находки я уже видел и сознательно оставил. Он не показывает динамику: стало ли хранилище лучше за месяц или хуже. И каждое новое правило приходится встраивать в общий проход, который постепенно разрастается.</p>
+<h2>Что дальше</h2>
+<p>Планирую сделать анализ постоянным, чтобы не прогонять весь аудит с нуля при каждом запуске и видеть, как меняется состояние хранилища. Открытый вопрос — как хранить историю находок между запусками: в файлах рядом с заметками или в отдельной базе.</p>
+</div></div></div></div></div></div>
+<div class="tm-article-presenter__meta">
+  <div class="tm-separated-list tm-article-presenter__meta-list"><span class="tm-separated-list__title">Теги:</span><ul class="tm-separated-list__list"><li class="tm-separated-list__item"><a href="/ru/search/?target_type=posts&amp;order=relevance&amp;q=%5Bobsidian%5D" class="tm-tags-list__link"><span>obsidian</span></a></li><li class="tm-separated-list__item"><a href="/ru/search/?target_type=posts&amp;order=relevance&amp;q=%5Bархитектура%5D" class="tm-tags-list__link"><span>архитектура</span></a></li><li class="tm-separated-list__item"><a href="/ru/search/?target_type=posts&amp;order=relevance&amp;q=%5Btypescript%5D" class="tm-tags-list__link"><span>typescript</span></a></li></ul></div>
+  <div class="tm-separated-list tm-article-presenter__meta-list"><span class="tm-separated-list__title">Хабы:</span><ul class="tm-separated-list__list"><li class="tm-separated-list__item"><a href="/ru/hubs/open_source/" class="tm-hubs-list__link"><span>Open source</span></a></li><li class="tm-separated-list__item"><a href="/ru/hubs/typescript/" class="tm-hubs-list__link"><span>TypeScript</span></a></li></ul></div>
+</div>
+<div class="tm-article-presenter__footer"><div class="tm-data-icons"><span title="Всего голосов 35: ↑33 и ↓2" class="tm-votes-meter__value tm-votes-meter__value_rating">+31</span><span class="bookmarks-button__counter">64</span><span class="tm-article-comments-counter-link__value">Комментарии 22</span></div></div>
+</div></main></div></body></html>

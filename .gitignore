@@ -1,0 +1,20 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+
+# Secrets: never commit
+.env
+.env.*
+!.env.example
+
+# Volatile editorial state (see README "Generated artifacts")
+.editorial/cache/
+.editorial/tmp/
+.editorial/research/**/raw/
+
+# Local test scratch
+.tmp/
+test-results/
+editorial-demo/

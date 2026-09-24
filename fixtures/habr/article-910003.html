@@ -1,0 +1,25 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Утечка памяти в Go-сервисе, которую не видел профилировщик / Хабр</title>
+<script type="application/ld+json">{"@context": "http://schema.org", "@type": "Article", "headline": "Утечка памяти в Go-сервисе, которую не видел профилировщик", "datePublished": "2026-09-23T06:00:00.000Z", "author": {"@type": "Person", "name": "fixture_author_c"}}</script></head>
+<body><div class="tm-layout"><main><div class="tm-article-presenter">
+<div class="tm-article-presenter__header">
+  <span class="tm-user-info__user"><a href="/ru/users/fixture_author_c/" class="tm-user-info__username">fixture_author_c</a></span>
+  <span class="tm-article-datetime-published"><time datetime="2026-09-23T06:00:00.000Z" title="">вчера в 09:00</time></span>
+  <span class="tm-icon-counter" title="Количество просмотров"><span class="tm-icon-counter__value">9.1K</span></span>
+  <h1 class="tm-title tm-title_h1" lang="ru" data-test-id="articleTitle"><span>Утечка памяти в Go-сервисе, которую не видел профилировщик</span></h1>
+</div>
+<div class="tm-article-presenter__body"><div class="tm-article-body"><div id="post-content-body"><div><div class="article-formatted-body article-formatted-body_version-2"><div xmlns="http://www.w3.org/1999/xhtml">
+<p>Память Go-сервиса росла на 200 MB в сутки, а pprof показывал стабильный heap. Проблема оказалась за пределами того, что видит профилировщик.</p>
+<h2>Что показывал pprof</h2>
+<p>Heap держался около 300 MB. RSS процесса при этом доходил до 2 GB к концу недели.</p>
+<pre><code class="go">debug.SetGCPercent(50)</code></pre>
+<h2>Причина</h2>
+<p>Память выделялась через cgo-библиотеку сжатия и не освобождалась при закрытии потока.</p>
+<h2>Выводы</h2>
+<p>Смотрите на RSS, а не только на heap.</p>
+</div></div></div></div></div></div>
+<div class="tm-article-presenter__meta">
+  <div class="tm-separated-list tm-article-presenter__meta-list"><span class="tm-separated-list__title">Теги:</span><ul class="tm-separated-list__list"><li class="tm-separated-list__item"><a href="/ru/search/?target_type=posts&amp;order=relevance&amp;q=%5Bразработка%5D" class="tm-tags-list__link"><span>разработка</span></a></li></ul></div>
+  <div class="tm-separated-list tm-article-presenter__meta-list"><span class="tm-separated-list__title">Хабы:</span><ul class="tm-separated-list__list"><li class="tm-separated-list__item"><a href="/ru/hubs/go/" class="tm-hubs-list__link"><span>Go</span></a></li></ul></div>
+</div>
+<div class="tm-article-presenter__footer"><div class="tm-data-icons"><span title="Всего голосов 45: ↑42 и ↓3" class="tm-votes-meter__value tm-votes-meter__value_rating">+39</span><span class="bookmarks-button__counter">90</span><span class="tm-article-comments-counter-link__value">Комментарии 22</span></div></div>
+</div></main></div></body></html>

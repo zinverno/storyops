@@ -1,0 +1,21 @@
+{
+  "comment": "URL -> fixture file. Used by the offline demo to seed the HTTP cache so the real Habr adapter runs without network access.",
+  "authorProfile": "https://habr.com/ru/users/demo_author/",
+  "pages": {
+    "https://habr.com/ru/users/demo_author/articles/": "author-list.html",
+    "https://habr.com/ru/articles/900001/": "article-900001.html",
+    "https://habr.com/ru/articles/900002/": "article-900002.html",
+    "https://habr.com/ru/articles/top/weekly/": "top-weekly.html",
+    "https://habr.com/ru/articles/910001/": "article-910001.html",
+    "https://habr.com/ru/articles/910002/": "article-910002.html",
+    "https://habr.com/ru/articles/910003/": "article-910003.html",
+    "https://habr.com/ru/articles/910004/": "article-910004.html",
+    "https://habr.com/ru/articles/910005/": "article-910005.html",
+    "https://habr.com/ru/articles/910006/": "article-910006.html",
+    "https://habr.com/ru/articles/910007/": "article-910007.html",
+    "https://habr.com/ru/articles/910008/": "article-910008.html",
+    "https://habr.com/ru/articles/910009/": "article-910009.html",
+    "https://habr.com/ru/articles/910010/": "article-910010.html",
+    "https://habr.com/ru/articles/910011/": "article-910011.html"
+  }
+}
