@@ -25,6 +25,10 @@ async function browserAvailable(): Promise<boolean> {
 }
 
 const hasBrowser = await browserAvailable();
+// CI sets EDITORIAL_REQUIRE_BROWSER=1 so a missing browser fails the run instead of silently skipping capture tests.
+if (!hasBrowser && process.env.EDITORIAL_REQUIRE_BROWSER === '1') {
+  throw new Error('EDITORIAL_REQUIRE_BROWSER=1 but no Chromium was found; run `npx playwright install --with-deps chromium`.');
+}
 if (!hasBrowser) console.warn('screenshots.test.ts: no Chromium found; Playwright capture tests are SKIPPED. Run `npx playwright install chromium`.');
 
 describe('screenshot planning', () => {

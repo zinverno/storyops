@@ -9,6 +9,7 @@ const run = promisify(execFile);
 const CLI = path.join(ROOT, 'dist/src/cli/index.js');
 
 // Runs against the compiled CLI; `npm run check` builds before testing.
+if (!existsSync(CLI) && process.env.EDITORIAL_REQUIRE_BUILD === '1') throw new Error('EDITORIAL_REQUIRE_BUILD=1 but dist/ is missing; run `npm run build` first.');
 describe.skipIf(!existsSync(CLI))('editorial-kit CLI (built)', () => {
   it('prints help and platform support', async () => {
     const help = await run('node', [CLI, '--help']);
