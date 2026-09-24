@@ -60,30 +60,48 @@ describe('bundled Agent Skills', () => {
     const home = '/home/tester';
 
     it('Codex project scope → <project>/.agents/skills', () => {
-      expect(skillTargetDir('codex', 'project', project, { env: {}, home })).toBe('/work/project/.agents/skills');
+      expect(skillTargetDir('codex', 'project', project, { home })).toBe('/work/project/.agents/skills');
+      expect(resolveInstallTarget({ agent: 'codex', scope: 'project', projectRoot: project, home })).toBe('/work/project/.agents/skills');
     });
 
-    it('Codex user scope without CODEX_HOME → ~/.codex/skills', () => {
-      expect(skillTargetDir('codex', 'user', project, { env: {}, home })).toBe('/home/tester/.codex/skills');
-      expect(skillTargetDir('codex', 'user', project, { env: { CODEX_HOME: '  ' }, home })).toBe('/home/tester/.codex/skills');
+    it('Codex user scope → $HOME/.agents/skills', () => {
+      expect(skillTargetDir('codex', 'user', project, { home })).toBe('/home/tester/.agents/skills');
+      expect(resolveInstallTarget({ agent: 'codex', scope: 'user', projectRoot: project, home })).toBe('/home/tester/.agents/skills');
     });
 
-    it('Codex user scope with custom CODEX_HOME → $CODEX_HOME/skills', () => {
-      expect(skillTargetDir('codex', 'user', project, { env: { CODEX_HOME: '/opt/codex-home' }, home })).toBe('/opt/codex-home/skills');
+    it('CODEX_HOME does not change the normal StoryOps user target', () => {
+      const previous = process.env.CODEX_HOME;
+      process.env.CODEX_HOME = '/opt/codex-home';
+      try {
+        expect(skillTargetDir('codex', 'user', project, { home })).toBe('/home/tester/.agents/skills');
+        expect(resolveInstallTarget({ agent: 'codex', scope: 'user', projectRoot: project, home })).not.toContain('codex-home');
+      } finally {
+        if (previous === undefined) delete process.env.CODEX_HOME;
+        else process.env.CODEX_HOME = previous;
+      }
     });
 
-    it('Claude project scope → <project>/.claude/skills', () => {
-      expect(skillTargetDir('claude', 'project', project, { env: { CODEX_HOME: '/opt/codex-home' }, home })).toBe('/work/project/.claude/skills');
+    it('explicit --target "$CODEX_HOME/skills" still works for legacy skill-installer compatibility', async () => {
+      const tmp = await tempDir();
+      try {
+        const codexHome = path.join(tmp.dir, 'codex-home');
+        const target = resolveInstallTarget({ agent: 'codex', scope: 'user', target: `${codexHome}/skills`, projectRoot: project, home });
+        expect(target).toBe(path.join(codexHome, 'skills'));
+        const r = await installSkills(path.join(ROOT, 'skills'), target);
+        expect(r.target).toBe(path.join(codexHome, 'skills'));
+        expect((await readdir(path.join(codexHome, 'skills'))).sort()).toEqual(['editorial-author', 'editorial-research', 'product-screenshots']);
+        expect(resolveInstallTarget({ target: 'rel/skills', projectRoot: project })).toBe('/work/project/rel/skills');
+      } finally {
+        await tmp.cleanup();
+      }
     });
 
-    it('Claude user scope → ~/.claude/skills (CODEX_HOME is ignored)', () => {
-      expect(skillTargetDir('claude', 'user', project, { env: { CODEX_HOME: '/opt/codex-home' }, home })).toBe('/home/tester/.claude/skills');
+    it('Claude paths are unchanged: <project>/.claude/skills and ~/.claude/skills', () => {
+      expect(skillTargetDir('claude', 'project', project, { home })).toBe('/work/project/.claude/skills');
+      expect(skillTargetDir('claude', 'user', project, { home })).toBe('/home/tester/.claude/skills');
     });
 
-    it('explicit --target overrides agent and scope', () => {
-      expect(resolveInstallTarget({ agent: 'codex', scope: 'user', target: 'custom/skills', projectRoot: project, env: { CODEX_HOME: '/opt/codex-home' }, home })).toBe('/work/project/custom/skills');
-      expect(resolveInstallTarget({ target: '/abs/skills', projectRoot: project })).toBe('/abs/skills');
-      expect(resolveInstallTarget({ agent: 'codex', scope: 'user', projectRoot: project, env: {}, home })).toBe('/home/tester/.codex/skills');
+    it('requires an explicit destination', () => {
       expect(() => resolveInstallTarget({ projectRoot: project })).toThrow(/Choose where to install/);
     });
   });

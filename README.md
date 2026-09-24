@@ -93,21 +93,24 @@ Skill folders are self-contained; copy or link them where your client looks for 
 | Client | Project scope | User (global) scope | Source |
 | --- | --- | --- | --- |
 | Claude Code | `<project>/.claude/skills/<name>/` | `~/.claude/skills/<name>/` | [Claude Code skills docs](https://code.claude.com/docs/en/skills) |
-| Codex | `<project>/.agents/skills/<name>/` | `$CODEX_HOME/skills/<name>/` (default `~/.codex/skills/<name>/`) | [Codex skills docs](https://developers.openai.com/codex/skills) ¹ |
+| Codex | `<project>/.agents/skills/<name>/` | `$HOME/.agents/skills/<name>/` | [Codex skills docs](https://developers.openai.com/codex/skills) |
 | Other clients | see the client's docs | | use `--target` |
 
-¹ The Codex docs page could not be fetched from the environment where this
-repository was built. The user location follows `CODEX_HOME` (default
-`~/.codex`), which is also where the `skill-installer` skill in
-[openai/skills](https://github.com/openai/skills) installs (`$CODEX_HOME/skills`);
-the repository-local `.agents/skills` location comes from secondary sources
-quoting the docs. Check both against the current OpenAI docs.
+Codex discovers repository skills in `.agents/skills` from the working
+directory up to the repository root, user skills in `$HOME/.agents/skills`,
+and admin skills in `/etc/codex/skills` (StoryOps never installs there).
+`$CODEX_HOME/skills` (default `~/.codex/skills`) is where Codex's built-in
+`skill-installer` puts skills. It is not StoryOps' default user destination,
+and setting `CODEX_HOME` does not change `--agent codex --scope user`. If you
+need that location for compatibility, pass it explicitly with `--target`.
+StoryOps installs into exactly one location per command.
 
 ```bash
 editorial-kit skills install --agent claude                 # → ./.claude/skills
 editorial-kit skills install --agent claude --scope user    # → ~/.claude/skills
 editorial-kit skills install --agent codex                  # → ./.agents/skills
-editorial-kit skills install --agent codex --scope user     # → $CODEX_HOME/skills, default ~/.codex/skills
+editorial-kit skills install --agent codex --scope user     # → ~/.agents/skills
+editorial-kit skills install --target "$CODEX_HOME/skills"  # explicit legacy skill-installer location
 editorial-kit skills install --target /any/skills/dir --link   # explicit target wins; symlink instead of copy
 ```
 

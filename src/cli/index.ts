@@ -424,11 +424,12 @@ skills
   .description(
     'copy (or link) the bundled skills into a skills directory. Explicit destination required; nothing is installed implicitly.\n' +
       'Destinations: claude project → <cwd>/.claude/skills, claude user → ~/.claude/skills,\n' +
-      'codex project → <cwd>/.agents/skills, codex user → $CODEX_HOME/skills (default ~/.codex/skills).',
+      'codex project → <cwd>/.agents/skills, codex user → ~/.agents/skills.\n' +
+      'Legacy Codex skill-installer location: pass --target "$CODEX_HOME/skills" (default ~/.codex/skills) explicitly.',
   )
   .addOption(new Option('--agent <agent>', 'use the documented location for this client').choices(['claude', 'codex']))
-  .addOption(new Option('--scope <scope>', 'project (current workspace) or user (home / $CODEX_HOME)').choices(['project', 'user']).default('project'))
-  .option('--target <dir>', 'explicit target directory (overrides --agent/--scope)')
+  .addOption(new Option('--scope <scope>', 'project (current workspace) or user (home directory)').choices(['project', 'user']).default('project'))
+  .option('--target <dir>', 'explicit target directory (overrides --agent/--scope), e.g. "$CODEX_HOME/skills"')
   .option('--link', 'symlink instead of copying (keeps skills in sync with this checkout)')
   .option('--force', 'replace existing skills with the same name')
   .action(async (o: { agent?: SkillAgent; scope: SkillScope; target?: string; link?: boolean; force?: boolean }) => {
