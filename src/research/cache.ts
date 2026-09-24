@@ -12,6 +12,8 @@ export const cacheEntrySchema = z.object({
   fetchedAt: z.string(),
   status: z.number().int(),
   contentType: z.string().optional(),
+  /** Final URL after redirects; the entry itself is keyed by the originally requested `url`. */
+  finalUrl: z.string().optional(),
   body: z.string(),
 });
 export type CacheEntry = z.infer<typeof cacheEntrySchema>;
@@ -55,7 +57,7 @@ export class HttpCache {
     await writeJson(this.fileFor(entry.platform, entry.url), { schemaVersion: 1, ...entry, url: entry.url });
   }
 
-  async list(platform?: string): Promise<Array<{ platform: string; url: string; fetchedAt: string; status: number; bytes: number }>> {
+  async list(platform?: string): Promise<Array<{ platform: string; url: string; finalUrl?: string; fetchedAt: string; status: number; bytes: number }>> {
     if (!pathExists(this.dir)) return [];
     const platforms = platform ? [platform] : (await readdir(this.dir, { withFileTypes: true })).filter((e) => e.isDirectory()).map((e) => e.name);
     const rows = [];
@@ -65,7 +67,7 @@ export class HttpCache {
       for (const file of (await readdir(dir)).filter((f) => f.endsWith('.json')).sort()) {
         try {
           const entry = cacheEntrySchema.parse(JSON.parse(await readFile(path.join(dir, file), 'utf8')));
-          rows.push({ platform: p, url: sanitizeUrl(entry.url), fetchedAt: entry.fetchedAt, status: entry.status, bytes: entry.body.length });
+          rows.push({ platform: p, url: sanitizeUrl(entry.url), ...(entry.finalUrl ? { finalUrl: sanitizeUrl(entry.finalUrl) } : {}), fetchedAt: entry.fetchedAt, status: entry.status, bytes: entry.body.length });
         } catch {
           // skip unreadable entries
         }

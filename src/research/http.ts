@@ -19,6 +19,8 @@ export interface FetchedPage {
   stale?: boolean;
   /** Why the live request failed when a stale copy was served. */
   liveError?: string;
+  /** Final URL when the live request was redirected (the cache key stays `url`). */
+  finalUrl?: string;
 }
 
 export interface HttpClientOptions {
@@ -39,11 +41,15 @@ export interface HttpClientOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
+/** Maximum redirects followed for one request (each hop is robots-checked and rate-limited). */
+export const MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
 const CHALLENGE_MARKERS = [/captcha/i, /cf-chl/i, /challenge-platform/i, /ddos-guard/i, /are you a robot/i, /access denied/i];
 
 /**
  * Polite HTTP client for public research:
- * - honours robots.txt (cannot be disabled),
+ * - honours robots.txt (cannot be disabled), including for every redirect hop,
  * - per-host minimum delay + small global concurrency,
  * - caches every successful public response,
  * - never sends cookies or credentials,
@@ -141,11 +147,10 @@ export class HttpClient {
       body = cached.entry.body;
       status = cached.entry.status;
     } else {
-      await this.waitForHost(origin.host);
-      const response = await this.request(robotsUrl);
+      const response = await this.fetchRobots(robotsUrl);
       status = response.status;
-      body = await response.text();
-      await this.options.cache.set({ platform, url: robotsUrl, fetchedAt: this.options.clock.now().toISOString(), status, body });
+      body = response.body;
+      await this.options.cache.set({ platform, url: robotsUrl, fetchedAt: this.options.clock.now().toISOString(), status, body, ...(response.finalUrl !== robotsUrl ? { finalUrl: response.finalUrl } : {}) });
     }
     if (status !== undefined && status >= 500) {
       throw new EditorialError('ROBOTS_UNAVAILABLE', `robots.txt for ${origin.host} returned ${status}; refusing to crawl.`);
@@ -155,26 +160,108 @@ export class HttpClient {
     return rules;
   }
 
+  /**
+   * One HTTP request. Redirects are never followed automatically: each hop is
+   * handled by the caller so it passes robots.txt and per-host scheduling.
+   * No cookies, credentials or Authorization headers are ever sent.
+   */
   private async request(url: string): Promise<Response> {
     return this.fetchImpl(url, {
       headers: { 'user-agent': this.userAgent, accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.5', 'accept-language': 'ru,en;q=0.8' },
-      redirect: 'follow',
+      redirect: 'manual',
       credentials: 'omit',
       signal: AbortSignal.timeout(this.options.timeoutMs),
     });
   }
 
-  private async fetchLive(platform: string, url: string): Promise<FetchedPage> {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new EditorialError('UNSUPPORTED_URL', `Unsupported URL scheme: ${parsed.protocol}`);
-    const rules = await this.robotsFor(parsed, platform);
-    if (!isAllowed(rules, `${parsed.pathname}${parsed.search}`)) {
-      throw new EditorialError('ROBOTS_DISALLOWED', `robots.txt disallows ${sanitizeUrl(url)} for automated clients; skipping.`);
+  /** Resolves a redirect Location against the current URL and validates it. */
+  private redirectTarget(response: Response, current: string, chain: readonly string[]): string {
+    const location = response.headers.get('location');
+    if (!location) throw new EditorialError('REDIRECT_INVALID', `${sanitizeUrl(current)} returned ${response.status} without a Location header`);
+    let next: URL;
+    try {
+      next = new URL(location, current);
+    } catch {
+      throw new EditorialError('REDIRECT_INVALID', `${sanitizeUrl(current)} redirected to an invalid URL`);
     }
+    next.hash = '';
+    if (next.protocol !== 'https:' && next.protocol !== 'http:') throw new EditorialError('REDIRECT_INVALID', `${sanitizeUrl(current)} redirected to unsupported scheme ${next.protocol}`);
+    const target = next.toString();
+    if (chain.includes(target)) throw new EditorialError('REDIRECT_LOOP', `Redirect loop: ${[...chain, target].map(sanitizeUrl).join(' → ')}`);
+    if (chain.length > MAX_REDIRECTS) throw new EditorialError('TOO_MANY_REDIRECTS', `More than ${MAX_REDIRECTS} redirects starting at ${sanitizeUrl(chain[0]!)}`);
+    return target;
+  }
+
+  /**
+   * robots.txt itself may redirect (e.g. http → https). Each hop is scheduled
+   * per host; after more than MAX_REDIRECTS hops robots.txt is treated as
+   * unavailable, as RFC 9309 allows.
+   */
+  private async fetchRobots(robotsUrl: string): Promise<{ status: number; body: string; finalUrl: string }> {
+    const chain = [robotsUrl];
+    let current = robotsUrl;
+    for (;;) {
+      await this.waitForHost(new URL(current).host);
+      const response = await this.request(current);
+      if (!REDIRECT_STATUSES.has(response.status)) return { status: response.status, body: await response.text(), finalUrl: current };
+      await response.body?.cancel().catch(() => undefined);
+      try {
+        current = this.redirectTarget(response, current, chain);
+      } catch (error) {
+        this.options.logger.warn(`robots.txt at ${sanitizeUrl(robotsUrl)}: ${errorMessage(error)}; treating it as unavailable.`);
+        return { status: 404, body: '', finalUrl: current };
+      }
+      chain.push(current);
+    }
+  }
+
+  /**
+   * Fetches a URL, following at most MAX_REDIRECTS redirects manually. Every
+   * hop (including the first) is checked for scheme, checked against the
+   * target origin's robots.txt, and scheduled with that host's delay and
+   * crawl-delay before it is requested.
+   *
+   * Caching: the entry is stored under the ORIGINALLY REQUESTED URL (so
+   * repeated requests hit the cache); the final URL after redirects is
+   * recorded in the entry as `finalUrl` for inspection.
+   */
+  private async fetchLive(platform: string, url: string): Promise<FetchedPage> {
+    const chain = [url];
+    let current = url;
+    for (;;) {
+      const parsed = new URL(current);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new EditorialError('UNSUPPORTED_URL', `Unsupported URL scheme: ${parsed.protocol}`);
+      const rules = await this.robotsFor(parsed, platform);
+      if (!isAllowed(rules, `${parsed.pathname}${parsed.search}`)) {
+        const via = chain.length > 1 ? ` (redirected from ${sanitizeUrl(url)})` : '';
+        throw new EditorialError('ROBOTS_DISALLOWED', `robots.txt disallows ${sanitizeUrl(current)}${via} for automated clients; skipping.`);
+      }
+      const { response, body } = await this.requestWithRetries(current, parsed.host, rules);
+      if (REDIRECT_STATUSES.has(response.status)) {
+        current = this.redirectTarget(response, current, chain);
+        chain.push(current);
+        this.options.logger.debug(`redirect ${response.status} → ${sanitizeUrl(current)}`);
+        continue;
+      }
+      if (response.status === 401 || response.status === 402 || response.status === 403 || (response.status >= 400 && CHALLENGE_MARKERS.some((m) => m.test(body.slice(0, 5000))))) {
+        throw new EditorialError('ACCESS_RESTRICTED', `${sanitizeUrl(current)} returned ${response.status} (access restricted or anti-bot challenge). Not retrying.`);
+      }
+      if (response.status >= 400) throw new EditorialError('HTTP_ERROR', `${sanitizeUrl(current)} returned ${response.status}`);
+      const fetchedAt = this.options.clock.now().toISOString();
+      const contentType = response.headers.get('content-type') ?? undefined;
+      await this.options.cache.set({ platform, url, fetchedAt, status: response.status, body, ...(contentType ? { contentType } : {}), ...(current !== url ? { finalUrl: current } : {}) });
+      const page: FetchedPage = { url, status: response.status, body, fetchedAt, fromCache: false };
+      if (current !== url) page.finalUrl = current;
+      return page;
+    }
+  }
+
+  /** One hop with retries for network errors, 429 and 5xx. Redirect bodies are discarded. */
+  private async requestWithRetries(url: string, host: string, rules: RobotsRules): Promise<{ response: Response; body: string }> {
     const maxRetries = this.options.maxRetries ?? 2;
     let lastError: unknown;
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-      await this.waitForHost(parsed.host, (rules.crawlDelaySeconds ?? 0) * 1000);
+      await this.waitForHost(host, (rules.crawlDelaySeconds ?? 0) * 1000);
       this.options.logger.debug(`GET ${sanitizeUrl(url)}${attempt > 0 ? ` (retry ${attempt})` : ''}`);
       let response: Response;
       try {
@@ -184,23 +271,18 @@ export class HttpClient {
         await this.sleep(1000 * 2 ** attempt);
         continue;
       }
-      const body = await response.text();
-      if (response.status === 401 || response.status === 402 || response.status === 403 || CHALLENGE_MARKERS.some((m) => m.test(body.slice(0, 5000)) && response.status >= 400)) {
-        throw new EditorialError('ACCESS_RESTRICTED', `${sanitizeUrl(url)} returned ${response.status} (access restricted or anti-bot challenge). Not retrying.`);
+      if (REDIRECT_STATUSES.has(response.status)) {
+        await response.body?.cancel().catch(() => undefined);
+        return { response, body: '' };
       }
+      const body = await response.text();
       if (response.status === 429 || response.status >= 500) {
         const retryAfter = Number(response.headers.get('retry-after'));
         lastError = new EditorialError('HTTP_RETRYABLE', `${sanitizeUrl(url)} returned ${response.status}`);
         await this.sleep(Math.min(60_000, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2000 * 2 ** attempt));
         continue;
       }
-      if (response.status >= 400) {
-        throw new EditorialError('HTTP_ERROR', `${sanitizeUrl(url)} returned ${response.status}`);
-      }
-      const fetchedAt = this.options.clock.now().toISOString();
-      const contentType = response.headers.get('content-type') ?? undefined;
-      await this.options.cache.set({ platform, url, fetchedAt, status: response.status, body, ...(contentType ? { contentType } : {}) });
-      return { url, status: response.status, body, fetchedAt, fromCache: false };
+      return { response, body };
     }
     throw lastError instanceof Error ? lastError : new EditorialError('NETWORK_ERROR', `Request to ${sanitizeUrl(url)} failed`);
   }
