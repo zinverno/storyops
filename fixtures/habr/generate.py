@@ -232,7 +232,7 @@ manifest = {
     "comment": "URL -> fixture file. Used by the offline demo to seed the HTTP cache so the real Habr adapter runs without network access.",
     "authorProfile": f"https://habr.com/ru/users/{AUTHOR}/",
     "pages": {
-        f"https://habr.com/ru/users/{AUTHOR}/publications/articles/": "author-list.html",
+        f"https://habr.com/ru/users/{AUTHOR}/articles/": "author-list.html",
         "https://habr.com/ru/articles/900001/": "article-900001.html",
         "https://habr.com/ru/articles/900002/": "article-900002.html",
         "https://habr.com/ru/articles/top/weekly/": "top-weekly.html",

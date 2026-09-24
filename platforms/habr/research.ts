@@ -15,10 +15,19 @@ const PERIODS = new Set(['daily', 'weekly', 'monthly', 'yearly', 'alltime']);
 
 /**
  * Public Habr URL patterns used by the adapter. They are plain public HTML
- * pages (no private/undocumented APIs). If Habr changes them, update here.
+ * pages (no private/undocumented APIs). If Habr changes them, update here and
+ * in tests/habr-urls.test.ts, which pins them.
+ *
+ * - Author articles: /<lang>/users/<username>/articles/ (pagination: …/articles/page2/).
+ *   The older /<lang>/users/<username>/publications/articles/ route is no longer used.
+ * - Top lists: /<lang>/articles/top/<period>/ and /<lang>/hubs/<hub>/articles/top/<period>/.
+ * - Articles: /<lang>/articles/<id>/ (links are taken from list pages as-is).
+ *
+ * These routes were not verified against live habr.com from the environment
+ * where they were written (network policy blocked the host).
  */
 export const habrUrls = {
-  userPublications: (username: string, lang = 'ru') => `${HABR_ORIGIN}/${lang}/users/${encodeURIComponent(username)}/publications/articles/`,
+  userPublications: (username: string, lang = 'ru') => `${HABR_ORIGIN}/${lang}/users/${encodeURIComponent(username)}/articles/`,
   top: (period: string, lang = 'ru') => `${HABR_ORIGIN}/${lang}/articles/top/${period}/`,
   hubTop: (hub: string, period: string, lang = 'ru') => `${HABR_ORIGIN}/${lang}/hubs/${encodeURIComponent(hub)}/articles/top/${period}/`,
 };

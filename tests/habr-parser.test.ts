@@ -47,7 +47,7 @@ describe('Habr value parsers', () => {
 
 describe('Habr list parser', () => {
   it('parses the author article list and skips promo blocks', async () => {
-    const page = parseArticleList(await fixture('habr/author-list.html'), 'https://habr.com/ru/users/demo_author/publications/articles/', NOW);
+    const page = parseArticleList(await fixture('habr/author-list.html'), 'https://habr.com/ru/users/demo_author/articles/', NOW);
     expect(page.items.map((i) => i.id)).toEqual(['900002', '900001']);
     const first = page.items[0]!;
     expect(first.url).toBe('https://habr.com/ru/articles/900002/');

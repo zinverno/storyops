@@ -105,12 +105,14 @@ describe('Habr research adapter (fixtures via injected fetch)', () => {
   afterEach(async () => tmp.cleanup());
 
   it('collects author history with article bodies', async () => {
-    const { impl } = await fixtureFetch();
+    const { impl, calls } = await fixtureFetch();
     const http = new HttpClient({ cache: new HttpCache(tmp.dir, 24), clock, logger: silentLogger, minDelayMs: 0, concurrency: 2, timeoutMs: 1000, fetchImpl: impl });
     const result = await habrPlatform.research!.collectAuthorHistory!('https://habr.com/ru/users/demo_author/', { http, logger: silentLogger, clock, config: { enabled: true } }, { maxArticles: 10 });
     expect(result.items.map((p) => p.id).sort()).toEqual(['habr:900001', 'habr:900002']);
     expect(result.failures).toEqual([]);
     expect(result.items.every((p) => p.text.length > 200)).toBe(true);
+    expect(calls).toContain('https://habr.com/ru/users/demo_author/articles/');
+    expect(calls.some((c) => c.includes('/publications/'))).toBe(false);
   });
 
   it('collects a trend window, deduplicates and extracts only abstract structure', async () => {

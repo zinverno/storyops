@@ -2,7 +2,7 @@
   "comment": "URL -> fixture file. Used by the offline demo to seed the HTTP cache so the real Habr adapter runs without network access.",
   "authorProfile": "https://habr.com/ru/users/demo_author/",
   "pages": {
-    "https://habr.com/ru/users/demo_author/publications/articles/": "author-list.html",
+    "https://habr.com/ru/users/demo_author/articles/": "author-list.html",
     "https://habr.com/ru/articles/900001/": "article-900001.html",
     "https://habr.com/ru/articles/900002/": "article-900002.html",
     "https://habr.com/ru/articles/top/weekly/": "top-weekly.html",

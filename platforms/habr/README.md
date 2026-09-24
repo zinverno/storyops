@@ -4,7 +4,7 @@
 | --- | --- |
 | Strategy | implemented (`strategy.ts`) |
 | Live trend research | implemented (`research.ts`): public top lists per period (`/ru/articles/top/<period>/`) and per hub (`/ru/hubs/<hub>/articles/top/<period>/`) |
-| Author history | implemented: public profile list (`/ru/users/<user>/publications/articles/`) + article pages |
+| Author history | implemented: public author article list (`/ru/users/<user>/articles/`, paginated as `…/articles/page2/`) + article pages |
 | Renderer | default scaffold renderer |
 
 ## Layout
