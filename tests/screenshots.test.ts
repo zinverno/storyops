@@ -4,11 +4,11 @@ import { readFile, readdir } from 'node:fs/promises';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resolveChromiumExecutable } from '../src/screenshots/browser.js';
-import { captureScreenshots } from '../src/screenshots/capture.js';
+import { captureScreenshots, describeLaunch } from '../src/screenshots/capture.js';
 import { planFromStory, renderPlanMarkdown } from '../src/screenshots/plan.js';
 import { imageManifestSchema, screenshotPlanSchema, type ScreenshotPlan } from '../src/screenshots/schema.js';
 import { canonicalStorySchema } from '../src/stories/schema.js';
-import { silentLogger } from '../src/shared/logger.js';
+import { memoryLogger, silentLogger } from '../src/shared/logger.js';
 import { clock, FIXTURES, ROOT, tempDir } from './helpers.js';
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -42,6 +42,40 @@ describe('screenshot planning', () => {
     expect(screenshotPlanSchema.safeParse(example).success).toBe(true);
     const bad = { ...example, steps: [{ name: 'x', screenshot: '../escape.png' }] };
     expect(screenshotPlanSchema.safeParse(bad).success).toBe(false);
+  });
+});
+
+const TOKEN_ARG = '--api-token=ghp_abcdefghijklmnopqrstuvwxyz0123456789';
+const ENV_SECRET = 'env-secret-value-0123456789';
+
+describe('screenshot launcher logging', () => {
+  it('describes a launch without argument or environment values', () => {
+    const text = describeLaunch({ command: '/usr/local/bin/node', args: ['server.js', TOKEN_ARG, 'Bearer abcdefghijklmnopqrstuvwxyz'], env: { API_TOKEN: ENV_SECRET } });
+    expect(text).toBe('node (3 arguments hidden, 1 env variable hidden)');
+    expect(text).not.toContain('ghp_');
+    expect(text).not.toContain(ENV_SECRET);
+  });
+
+  it('never logs secret-bearing arguments or env values, even when the launch fails', async () => {
+    const tmp = await tempDir();
+    const logger = memoryLogger();
+    try {
+      const plan = screenshotPlanSchema.parse({
+        baseUrl: 'http://127.0.0.1:9',
+        launch: { command: path.join(tmp.dir, 'missing-binary'), args: [TOKEN_ARG], env: { API_TOKEN: ENV_SECRET } },
+        steps: [{ name: 'x', path: '/', screenshot: 'x.png' }],
+      });
+      const run = captureScreenshots({ plan, planDir: tmp.dir, originalsDir: path.join(tmp.dir, 'o'), manifestFile: path.join(tmp.dir, 'm.json'), defaults: { viewport: { width: 800, height: 600 }, deviceScaleFactor: 1 }, clock, logger });
+      const error = await run.catch((e: unknown) => e as Error);
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toMatch(/Could not start missing-binary \(1 argument hidden, 1 env variable hidden\): ENOENT/);
+      const everything = `${JSON.stringify(logger.records)}\n${(error as Error).message}`;
+      expect(everything).toContain('Starting application: missing-binary');
+      expect(everything).not.toContain('ghp_abcdefghijklmnopqrstuvwxyz');
+      expect(everything).not.toContain(ENV_SECRET);
+    } finally {
+      await tmp.cleanup();
+    }
   });
 });
 
@@ -127,6 +161,25 @@ describe.skipIf(!hasBrowser)('Playwright capture (local fixture app)', () => {
     expect(result.failed[0]!.reason).toMatch(/Privacy check failed: visible assignment/);
     expect(result.failed[1]!.reason).toMatch(/email/);
     expect(result.failed[0]!.reason).not.toContain('FIXTURE-not-a-real-key');
+  });
+
+  it('starts a local app from the plan without logging its arguments or env', async () => {
+    const logger = memoryLogger();
+    const p = screenshotPlanSchema.parse({
+      baseUrl,
+      viewport: { width: 800, height: 600 },
+      privacy: { hide: ['#debug-panel'], mask: ['.user-email'] },
+      launch: { command: process.execPath, args: ['-e', 'setTimeout(() => {}, 5000)', TOKEN_ARG], env: { API_TOKEN: ENV_SECRET }, readyUrl: `${baseUrl}/` },
+      steps: [{ name: 'launched', path: '/', waitFor: '[data-ready=true]', screenshot: '06-launched.png' }],
+    });
+    const result = await captureScreenshots({ plan: p, planDir: tmp.dir, originalsDir: path.join(tmp.dir, 'images/originals'), manifestFile: path.join(tmp.dir, 'images/manifest.json'), defaults: { viewport: { width: 800, height: 600 }, deviceScaleFactor: 1 }, clock, logger });
+    expect(result.captured.map((c) => c.step)).toEqual(['launched']);
+    const logged = JSON.stringify(logger.records);
+    expect(logged).toContain('Starting application:');
+    expect(logged).toContain('3 arguments hidden, 1 env variable hidden');
+    expect(logged).not.toContain('ghp_abcdefghijklmnopqrstuvwxyz');
+    expect(logged).not.toContain(ENV_SECRET);
+    expect(logged).not.toContain('setTimeout');
   });
 
   it('reports a clear failure when the ready state never appears', async () => {

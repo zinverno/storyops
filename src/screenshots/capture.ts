@@ -7,7 +7,7 @@ import { EditorialError, errorMessage } from '../shared/errors.js';
 import { ensureDir, pathExists, readJsonIfExists, writeJson } from '../shared/fs.js';
 import { sha256 } from '../shared/hash.js';
 import type { Logger } from '../shared/logger.js';
-import { sanitizeUrl } from '../shared/redact.js';
+import { redactSecrets, sanitizeUrl } from '../shared/redact.js';
 import { resolveChromiumExecutable } from './browser.js';
 import { scanPage } from './privacy.js';
 import { imageManifestSchema, type ImageManifest, type ScreenshotPlan, type ScreenshotStep } from './schema.js';
@@ -78,19 +78,41 @@ async function electronTarget(plan: Extract<ScreenshotPlan['target'], { kind: 'e
   return { kind: 'electron', page: async () => page, version: () => undefined, close: async () => app.close() };
 }
 
+/**
+ * Human-readable description of a launch command for logs. Arguments and
+ * environment values may carry tokens, so only the executable name and the
+ * number of arguments/env variables are shown, never their values.
+ */
+export function describeLaunch(launch: Pick<NonNullable<ScreenshotPlan['launch']>, 'command' | 'args' | 'env'>): string {
+  const executable = redactSecrets(path.basename(launch.command.trim().split(/\s+/)[0] ?? launch.command));
+  const envCount = Object.keys(launch.env ?? {}).length;
+  return `${executable} (${launch.args.length} argument${launch.args.length === 1 ? '' : 's'} hidden${envCount ? `, ${envCount} env variable${envCount === 1 ? '' : 's'} hidden` : ''})`;
+}
+
 async function startApp(launch: NonNullable<ScreenshotPlan['launch']>, planDir: string, logger: Logger): Promise<ChildProcess> {
-  logger.info(`Starting application: ${launch.command} ${launch.args.join(' ')}`);
+  logger.info(`Starting application: ${describeLaunch(launch)}`);
   const child = spawn(launch.command, launch.args, {
     cwd: launch.cwd ? path.resolve(planDir, launch.cwd) : planDir,
     env: { ...process.env, ...launch.env },
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: process.platform !== 'win32',
   });
+  // Child output is drained and discarded: it may contain secrets and is never logged.
   child.stdout?.resume();
   child.stderr?.resume();
+  let spawnError: Error | undefined;
+  child.once('error', (error) => {
+    spawnError = error;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  const failed = () => (spawnError ? new EditorialError('APP_LAUNCH', `Could not start ${describeLaunch(launch)}: ${(spawnError as NodeJS.ErrnoException).code ?? 'spawn error'}`) : undefined);
+  const early = failed();
+  if (early) throw early;
   if (launch.readyUrl) {
     const deadline = Date.now() + launch.readyTimeoutMs;
     for (;;) {
+      const launchError = failed();
+      if (launchError) throw launchError;
       if (child.exitCode !== null) throw new EditorialError('APP_EXITED', `Application exited with code ${child.exitCode} before becoming ready`);
       try {
         const res = await fetch(launch.readyUrl, { signal: AbortSignal.timeout(2000) });
