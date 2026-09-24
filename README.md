@@ -275,14 +275,20 @@ continuity, reports) carries a `schemaVersion` for future migrations.
 
 ## Research ethics and safety
 
-- Public pages only; robots.txt is honoured and cannot be disabled; ≥ 1 s per-host delay
+- Public pages only; robots.txt is honoured and cannot be disabled, including for every redirect hop
+  (at most 5 redirects, each checked against the target origin's robots.txt and rate limit); ≥ 1 s per-host delay
   (default 2 s), concurrency ≤ 4 (default 2), timeouts, caching with TTL, `--refresh`, `--offline`.
 - 401/403/anti-bot challenges stop the request. No authentication, paywall or private-API bypass.
 - Research snapshots keep metadata, numbers and abstract features only; never article text.
 - Momentum is a documented heuristic, not a quality score or a prediction.
 - Evidence collection and project inspection skip secret-like paths (`.env`, keys,
-  credentials); logs and excerpts pass through secret redaction; screenshots are
-  blocked when secret-like text or unmasked emails are visible.
+  credentials); logs and excerpts pass through secret redaction; screenshot launch
+  commands are logged without argument or environment values.
+- Screenshots are blocked when **DOM text or form values** contain secret-like
+  strings or unmasked emails. Pixels are not inspected (no OCR): text inside
+  images, canvas, video, CSS backgrounds and iframes is invisible to the scan.
+  Such elements are counted in `images/manifest.json`, and every image is marked
+  `"visualReview": "required"` until a human or agent has looked at it.
 
 ## Development
 
@@ -311,7 +317,8 @@ Chromium build (they are skipped, with a warning, when none is found).
 - Index, continuity and narrative gap are deterministic heuristics (keyword
   patterns, stems, glossary). They produce leads to verify; fields they cannot
   decide are marked `unresolved` for the agent.
-- Screenshots need a runnable product and a Chromium build.
+- Screenshots need a runnable product and a Chromium build. The privacy scan covers DOM text and form values only;
+  visual review of every image remains mandatory.
 - Electron capture is implemented behind the same interface but **experimental
   and untested** (no Electron app in the test suite).
 - No automatic publishing in v1.

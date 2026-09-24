@@ -351,7 +351,14 @@ shots
   .action(async (o: { plan: string; out?: string; replace?: boolean; only?: string[] }) => {
     const c = await ctx();
     const r = await screenshotCaptureWorkflow(c, path.resolve(o.plan), { ...(o.out ? { out: o.out } : {}), ...(o.replace ? { replace: true } : {}), ...(o.only ? { only: o.only } : {}) });
-    out(r, [...r.captured.map((x) => `captured ${x.step} → ${rel(x.file)}`), ...r.skipped.map((x) => `skipped ${x.step}: ${x.reason}`), ...r.failed.map((x) => `FAILED ${x.step}: ${x.reason}`)]);
+    out(r, [
+      ...r.captured.map((x) => `captured ${x.step} → ${rel(x.file)}`),
+      ...r.skipped.map((x) => `skipped ${x.step}: ${x.reason}`),
+      ...r.failed.map((x) => `FAILED ${x.step}: ${x.reason}`),
+      ...(r.captured.length
+        ? ['', 'Visual review REQUIRED: the privacy scan reads DOM text and form values only, not pixels (images, canvas, video, CSS backgrounds, iframes).', 'Look at every image, then set "visualReview": "passed" in images/manifest.json.']
+        : []),
+    ]);
     if (r.failed.length) process.exitCode = 1;
   });
 

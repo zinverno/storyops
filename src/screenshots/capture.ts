@@ -9,7 +9,7 @@ import { sha256 } from '../shared/hash.js';
 import type { Logger } from '../shared/logger.js';
 import { redactSecrets, sanitizeUrl } from '../shared/redact.js';
 import { resolveChromiumExecutable } from './browser.js';
-import { scanPage } from './privacy.js';
+import { PRIVACY_SCAN_COVERAGE, scanPage } from './privacy.js';
 import { imageManifestSchema, type ImageManifest, type ScreenshotPlan, type ScreenshotStep } from './schema.js';
 
 export interface CaptureOptions {
@@ -207,8 +207,14 @@ export async function captureScreenshots(options: CaptureOptions): Promise<Captu
         const hidden = [...plan.privacy.hide, ...step.hide];
         const masked = [...plan.privacy.mask, ...step.mask];
         if (hidden.length) await page.addStyleTag({ content: `${hidden.join(', ')} { visibility: hidden !important; }` });
+        let privacyScan: ImageManifest['images'][number]['privacyScan'] = { coverage: 'none' };
         if (plan.privacy.blockOnSecrets) {
           const scan = await scanPage(page, [...hidden, ...masked], { includeEmails: !plan.privacy.allowEmails });
+          privacyScan = { coverage: PRIVACY_SCAN_COVERAGE, unscannedElements: scan.unscanned };
+          const unscannedTotal = Object.values(scan.unscanned).reduce((a, b) => a + b, 0);
+          if (unscannedTotal > 0) {
+            logger.warn(`${step.name}: ${unscannedTotal} image/canvas/video/background/embedded element(s) are not scanned for secrets (no OCR). Review the screenshot visually.`);
+          }
           if (scan.findings.length > 0 || scan.filledPasswordFields > 0) {
             const kinds = [...new Set(scan.findings.map((f) => f.patternId))];
             if (scan.filledPasswordFields) kinds.push('filled-password-field');
@@ -239,6 +245,8 @@ export async function captureScreenshots(options: CaptureOptions): Promise<Captu
           bytes: bytes.length,
           masked,
           hidden,
+          privacyScan,
+          visualReview: 'required',
         };
         if (plan.target.kind === 'web') entry.location = new URL(page.url()).pathname;
         if (step.purpose) entry.purpose = step.purpose;

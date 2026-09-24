@@ -89,6 +89,19 @@ export const imageManifestSchema = z.object({
       masked: z.array(z.string()),
       hidden: z.array(z.string()),
       browser: z.string().optional(),
+      /**
+       * What the automatic privacy scan covered. It reads DOM text and form
+       * values only; pixels (images, canvas, video, CSS backgrounds, iframes)
+       * are counted in `unscannedElements` but never inspected.
+       */
+      privacyScan: z
+        .object({
+          coverage: z.enum(['dom-text-and-form-values', 'none']),
+          unscannedElements: z.object({ images: z.number().int(), canvases: z.number().int(), videos: z.number().int(), backgroundImages: z.number().int(), embedded: z.number().int() }).optional(),
+        })
+        .optional(),
+      /** Every screenshot needs a human/agent visual review before publishing; set to "passed" after reviewing. */
+      visualReview: z.enum(['required', 'passed']).default('required'),
     }),
   ),
 });

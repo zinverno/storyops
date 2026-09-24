@@ -136,7 +136,8 @@ describe.skipIf(!hasBrowser)('Playwright capture (local fixture app)', () => {
     const clipped = await readFile(path.join(tmp.dir, 'images/originals/02-finding.png'));
     expect(clipped.readUInt32BE(16)).toBeLessThan(1024);
     const manifest = imageManifestSchema.parse(JSON.parse(await readFile(path.join(tmp.dir, 'images/manifest.json'), 'utf8')));
-    expect(manifest.images[0]).toMatchObject({ file: '01-dashboard.png', step: 'dashboard', purpose: 'entry point', location: '/', masked: ['.user-email'], hidden: ['#debug-panel'] });
+    expect(manifest.images[0]).toMatchObject({ file: '01-dashboard.png', step: 'dashboard', purpose: 'entry point', location: '/', masked: ['.user-email'], hidden: ['#debug-panel'], visualReview: 'required' });
+    expect(manifest.images[0]!.privacyScan?.coverage).toBe('dom-text-and-form-values');
   });
 
   it('never overwrites originals; --replace archives the previous file', async () => {
@@ -180,6 +181,19 @@ describe.skipIf(!hasBrowser)('Playwright capture (local fixture app)', () => {
     expect(logged).not.toContain('ghp_abcdefghijklmnopqrstuvwxyz');
     expect(logged).not.toContain(ENV_SECRET);
     expect(logged).not.toContain('setTimeout');
+  });
+
+  it('does not inspect pixels: raster content is counted and flagged for visual review, never claimed as scanned', async () => {
+    const logger = memoryLogger();
+    const p = screenshotPlanSchema.parse({ baseUrl, viewport: { width: 800, height: 600 }, steps: [{ name: 'raster', path: '/raster.html', waitFor: '#ready', screenshot: '07-raster.png' }] });
+    const result = await captureScreenshots({ plan: p, planDir: tmp.dir, originalsDir: path.join(tmp.dir, 'images/originals'), manifestFile: path.join(tmp.dir, 'images/manifest.json'), defaults: { viewport: { width: 800, height: 600 }, deviceScaleFactor: 1 }, clock, logger });
+    // Known limitation: a token drawn on a canvas is NOT detected (no OCR).
+    expect(result.captured.map((c) => c.step)).toEqual(['raster']);
+    const manifest = imageManifestSchema.parse(JSON.parse(await readFile(path.join(tmp.dir, 'images/manifest.json'), 'utf8')));
+    const entry = manifest.images.find((i) => i.file === '07-raster.png')!;
+    expect(entry.visualReview).toBe('required');
+    expect(entry.privacyScan).toEqual({ coverage: 'dom-text-and-form-values', unscannedElements: { images: 1, canvases: 1, videos: 0, backgroundImages: 1, embedded: 0 } });
+    expect(JSON.stringify(logger.records)).toMatch(/3 image\/canvas\/video\/background\/embedded element\(s\) are not scanned for secrets \(no OCR\)/);
   });
 
   it('reports a clear failure when the ready state never appears', async () => {
