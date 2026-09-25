@@ -1,10 +1,10 @@
 ---
 name: editorial-research
-description: Editorial research for technical publications. Collects and indexes an author's publication history, builds the cross-platform continuity map, runs dated public platform research (live for Habr) with transparent heuristic momentum, extracts abstract editorial patterns without copying content, and checks topic collision and saturated angles. Use when you need to know what the author already published, what is currently performing on a platform, or whether a topic is saturated.
+description: Editorial research for technical publications. Collects and indexes an author's publication history, builds the cross-platform continuity map, runs dated public platform research (live for Habr) with transparent heuristic momentum, extracts abstract editorial patterns without copying content, turns them into article-specific pattern transfer decisions, and checks topic collision and saturated angles. Use when you need to know what the author already published, what is currently performing on a platform, how current patterns apply to a specific article, or whether a topic is saturated.
 license: MIT
 compatibility: Needs the editorial-kit CLI (Node.js 20.19+). Live Habr research needs public internet access to habr.com; everything else works offline from cache and fixtures. No paid AI APIs.
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
   repository: "https://github.com/zinverno/storyops"
 ---
 
@@ -51,6 +51,22 @@ editorial-kit research -p habr --offline     # cache only
   date, sample size, windows, filters, limitations.
 - Momentum vs lifetime popularity: see [references/trend-analysis.md](references/trend-analysis.md).
 
+## From observations to pattern transfer
+
+Research does not end at "here are current patterns". For a specific article,
+each observation goes through
+
+```
+observation → strength / provenance → apply | adapt | skip → article-specific consequence
+```
+
+in `articles/<slug>/editorial/pattern-transfer.json`, created by
+`editorial-kit editorial plan` from the compressed snapshot (observations,
+metrics, abstract features, provenance). Do not re-read researched article
+bodies for this; open one only to verify a specific observation, and say why.
+Research informs the decision; it does not decide the prose. Details:
+[references/trend-analysis.md](references/trend-analysis.md#pattern-transfer).
+
 ## Topic collision
 
 ```bash
@@ -64,6 +80,7 @@ Interpretation: [references/topic-collision.md](references/topic-collision.md).
 - Report observations with sample size and limitations; separate OBSERVATION from RECOMMENDATION.
 - Never state "users prefer X" or predict success, virality or engagement lifts.
 - Never copy, paraphrase or template another article or author: [references/originality-policy.md](references/originality-policy.md).
+- A skipped pattern with a clear reason (weak sample, does not fit the story, no evidence, clickbait, author override) is a good outcome.
 - Respect robots.txt, rate limits and access restrictions. Never bypass authentication, paywalls, anti-bot protection or private APIs.
 - A 12-hour-old article and a year-old article are not compared by total views.
 

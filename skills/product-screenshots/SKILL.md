@@ -25,6 +25,8 @@ a purpose and supports a specific section.
    and [references/privacy.md](references/privacy.md). The automatic scan does not see pixels. Only then set
    `"visualReview": "passed"` for that image in `images/manifest.json`.
 5. Reference useful images in the story as `screenshot:<file>` evidence.
+6. When an editorial plan exists, record in `editorial/direction.json → visuals` which section and which story
+   claim each image supports, and add the visual id to the voice-plan beat that uses it (`visualIds`).
 
 ## Decision rules
 

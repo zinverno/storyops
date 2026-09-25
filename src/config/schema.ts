@@ -80,6 +80,13 @@ export const editorialConfigSchema = z.object({
       browserExecutablePath: z.string().optional(),
     })
     .default({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1, outputDir: 'images' }),
+  /** Optional Phase 2 editorial defaults. Article style is normally chosen per article. */
+  editorial: z
+    .object({
+      /** Style preset used by `editorial plan` when no --style is given (e.g. "engineering-story"). */
+      defaultStyle: z.string().regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
+    })
+    .optional(),
   paths: z
     .object({
       editorialDir: z.string().default('.editorial'),

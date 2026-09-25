@@ -13,7 +13,9 @@ import { validateStory } from '../stories/validate.js';
 
 /**
  * Where a packaging recommendation comes from. Order encodes the priority
- * model: factual truth > author voice > continuity > platform strategy > trends.
+ * model: factual truth > explicit author material > author voice > article
+ * style > continuity > platform strategy > trends. (Author material and style
+ * live in the editorial layer, src/editorial/.)
  */
 export type RecommendationSource = 'evidence' | 'author-voice' | 'continuity' | 'narrative-gap' | 'platform-strategy' | 'trend-observation' | 'topic-collision';
 

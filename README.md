@@ -53,14 +53,138 @@ what happened, with evidence references. Every platform output is written from
 the story, never from another platform's output. Repurposing means re-reading
 the story and applying a different strategy, not summarising the Habr article.
 
-Priority model, enforced in briefs and skills:
+Priority model, enforced in briefs, editorial validation and skills:
 
 ```
-FACTUAL TRUTH > AUTHOR VOICE > NARRATIVE CONTINUITY > PLATFORM STRATEGY > CURRENT TREND PATTERNS
+FACTUAL TRUTH
+  > EXPLICIT USER MATERIAL AND INSTRUCTIONS
+  > AUTHOR VOICE
+  > ARTICLE STYLE PRESET
+  > NARRATIVE CONTINUITY
+  > PLATFORM STRATEGY
+  > CURRENT TREND PATTERNS
 ```
 
+Inside the author's own material: `DO NOT USE > VERBATIM / MUST USE > SHOULD USE > MAY USE > BACKGROUND ONLY`.
 Trend research is advisory: it may influence packaging (headline, opening,
-density, structure, length), never the topic or the facts.
+density, structure, length), never the topic or the facts. Conflicts are
+surfaced, never silently resolved.
+
+## From facts to voice
+
+A correct canonical story is not yet an article. Drafting straight from
+`story.json`, the evidence map and a brief tends to produce a dry technical
+summary: documentation, release notes, an architecture inventory. The
+editorial layer sits between facts and prose:
+
+```
+FACTS → CANONICAL STORY → AUTHOR MATERIAL → PATTERN TRANSFER → EDITORIAL DIRECTION
+      → VOICE PLAN → PLATFORM ADAPTATION → DRAFT → EDITORIAL AUDIT
+```
+
+| Artifact | What it is |
+| --- | --- |
+| `story.json` | the factual source of truth (what happened, with evidence) |
+| `author-input.md` | what the author wants to contribute: exact phrases, must-have ideas, jokes, fragments, things to avoid |
+| style preset (`styles/*.yaml`) | what kind of article this is (engineering story, dev diary, postmortem…) |
+| `editorial/pattern-transfer.md` | how current platform research influences packaging, decision by decision |
+| `editorial/direction.md` | the editorial decision: reader promise, angle, conflict, what it is NOT, policies |
+| `editorial/voice-plan.md` | how facts become narrative: beats, episodes, first person, humor, limitations |
+| `outputs/<platform>.md` | the actual publication |
+| `editorial/audit.md` | did the author's material and the chosen patterns make it in; where does it read like documentation |
+
+Five things stay distinct: **author voice** (how this author sounds),
+**style preset** (what kind of piece), **platform strategy** (how the platform
+packages content), **trend pattern** (what research suggests), **canonical
+story** (what actually happened).
+
+The bad flow this replaces:
+
+```
+story.json → LLM paraphrases every field → article
+```
+
+The intended flow:
+
+```
+story.json + author input + platform research + author voice + style
+  → editorial decisions → narrative → article
+```
+
+The CLI has no language model. `editorial plan` collects inputs, validates
+schemas, prefills known facts, copies research observations with provenance
+and leaves explicit `TODO(agent)` decisions; the **editorial-author** skill
+makes the decisions, writes an optional 400–800 word voice calibration sample
+for long-form pieces, drafts, and records how the author's material was used.
+
+### Author input
+
+`articles/<slug>/author-input.md` accepts raw, unformatted material. No section
+is required; an empty file is valid. Author input is editorial material, never
+evidence: facts still enter the article only through story claims.
+
+```markdown
+## VERBATIM
+- "Finding перестал быть просто строкой в отчёте."
+## MUST USE
+- мне тут хочется сказать что сначала updatedAt вообще казался нормальным решением,
+  а потом оказалось что поле отвечает за два разных смысла
+## MAY USE
+- Можно пошутить, что updatedAt устроился сразу на две работы.
+## DO NOT USE
+- революционный
+```
+
+Sections: `VERBATIM` (checked literally), `MUST USE` (the idea must appear),
+`SHOULD USE`, `MAY USE`, `BACKGROUND ONLY`, `DO NOT USE`, `RAW NOTES`,
+`PERSONAL CONTEXT` (the only legitimate source of first-person experiences),
+`POSSIBLE HUMOR`, `QUESTIONS / UNCERTAINTIES`.
+
+### Editorial commands
+
+| Command | Does |
+| --- | --- |
+| `editorial-kit input init --story <story>` | create `author-input.md` (template) |
+| `editorial-kit input add --story <story> --priority verbatim\|must\|should\|may\|background\|avoid --text "…"` | append one item; the Markdown stays the source of truth |
+| `editorial-kit input show --story <story>` | parsed items with ids, issues |
+| `editorial-kit styles list` / `styles show <id>` / `styles validate` | built-in and `.editorial/styles/` presets |
+| `editorial-kit editorial plan --story <story> --platform <id> [--style <id>] [--type <t>] [--reset]` | create or refresh `author-input.md` (if missing) and `editorial/{direction,pattern-transfer,voice-plan}.{json,md}`; keeps decisions, flags drift for review |
+| `editorial-kit editorial validate --story <story> --platform <id>` | style exists, no unresolved decisions, pattern decisions resolved, voice plan complete, provenance current (story, author input, author voice, style, strategy, research snapshot), story and evidence still valid |
+| `editorial-kit editorial audit --story <story> --platform <id> [--output <file>]` | post-draft audit into `editorial/audit.{json,md}` |
+
+A second platform for the same article gets `editorial/<platform>/`.
+`repurpose` still works without a plan (v1 behaviour) and says when none exists.
+Built-in styles: `engineering-story`, `architecture-deep-dive`, `dev-diary`,
+`postmortem`, `tutorial`, `product-story`, `technical-essay`,
+`release-retrospective`. Add your own as `.editorial/styles/<id>.yaml` (same
+schema, validated, no code changes). `"editorial": { "defaultStyle": "<id>" }` in
+the config is optional.
+
+### Provenance and drift
+
+Every editorial artifact records hashes of the inputs it was built from. If
+the author edits `author-input.md` after the plan was made, `editorial validate`
+reports `author input (author-input.md) changed since voice plan was created`.
+Re-running `editorial plan` refreshes the plan, keeps decisions, adds new author
+items as pending and records `reviewRequired` entries; validation stays blocked
+until the plan has been reviewed. The same applies to story edits, author voice
+changes, a different style or style version, a new platform strategy version
+and a modified or newer research snapshot.
+
+### Audit
+
+`VERBATIM` phrases and `DO NOT USE` phrases are checked literally in the
+publishable text (whitespace is the only normalisation). `MUST`/`SHOULD`
+ideas and applied patterns cannot be proven by string matching, so the agent
+records where each one landed (`paragraphs`, `lines`, `heading`, `excerpt`) in
+`audit.json`, and the CLI verifies that the location exists and contains the
+excerpt. Unmapped MUST → error, SHOULD → warning, MAY → nothing; an applied
+pattern that is not mapped → warning, unless recorded as `overridden-by-author`.
+Voice and dryness checks (list and heading density, runs of short paragraphs,
+headings that mirror story fields, definition-first openings, repeated openings,
+missing first person in a first-person style, em dashes, "не X, а Y", triads)
+are advisory warnings. There is no quality score, and a clean audit does not
+prove the prose is good.
 
 ## Installation
 
@@ -149,7 +273,16 @@ editorial-kit brief -s articles/my-story/story.json -p habr
 editorial-kit screenshots plan -s articles/my-story/story.json --base-url http://localhost:3000
 editorial-kit screenshots capture --plan articles/my-story/screenshot-plan.json
 
+editorial-kit input init --story articles/my-story/story.json
+#   → the author throws raw material into author-input.md (optional)
+editorial-kit editorial plan --story articles/my-story/story.json --platform habr --style engineering-story
+#   → the editorial-author skill fills pattern transfer, direction and voice plan
+editorial-kit editorial validate --story articles/my-story/story.json --platform habr
+#   → long-form: a 400–800 word voice sample in editorial/voice-sample.md first
+
 editorial-kit repurpose articles/my-story/story.json -p habr --type architecture-deep-dive
+#   → the draft is written from the voice plan
+editorial-kit editorial audit --story articles/my-story/story.json --platform habr --output articles/my-story/outputs/habr.md
 editorial-kit repurpose articles/my-story/story.json -p telegram
 editorial-kit style articles/my-story/outputs/habr.md
 ```
@@ -176,6 +309,13 @@ The same scenario is the end-to-end test (`tests/e2e-demo.test.ts`). Its summary
 - **Unique contribution:** the architecture evolution, backed by code, tests and an ADR.
 - **Trend observation:** higher-momentum articles in the sample expose the technical conflict early.
 - **Packaging:** begin from the old architecture's limitation; do not reintroduce the project from zero.
+- **Editorial layer:** author input (a VERBATIM phrase, a MUST idea, a SHOULD item, a joke, a forbidden word,
+  a raw note), an `engineering-story` plan for Habr where the early-conflict observation is applied and the
+  measurements observation is skipped for lack of evidence, the recorded editorial decisions
+  (`fixtures/editorial/decisions.json`), validation, a fixture draft, and the audit: the VERBATIM phrase is
+  found exactly, the MUST item is mapped, the SHOULD item is omitted with a recorded reason (it has no story
+  claim yet), five patterns are placed, and a variant with forbidden wording is rejected
+  (`tests/e2e-editorial.test.ts`).
 
 ## Architecture
 
@@ -198,6 +338,7 @@ flowchart TD
   WF --> STORY[canonical story<br/>src/stories]
   WF --> EV[evidence<br/>src/evidence]
   WF --> BR[briefs<br/>src/briefs]
+  WF --> ED[editorial layer<br/>src/editorial + styles/]
   WF --> SS[screenshots<br/>src/screenshots → Playwright]
   WF --> REG[platform registry<br/>platforms/]
   REG --> HABR[habr: strategy + research + parser]
@@ -219,6 +360,7 @@ flowchart TD
 | `src/similarity`, `src/collision` | TF-IDF/BM25/cosine/Jaccard; topic collision |
 | `src/research` | HTTP client, cache, robots.txt, momentum, structure features, patterns, snapshots |
 | `src/stories`, `src/evidence`, `src/briefs` | canonical story, evidence mapping, briefs |
+| `src/editorial`, `styles/` | author input, style presets, provenance, pattern transfer, direction, voice plan, audit |
 | `src/screenshots` | plans, Playwright capture, privacy scan |
 | `src/platforms` | draft-workspace renderer shared by strategies |
 | `src/workflow`, `src/cli`, `src/demo` | orchestration, CLI, offline demo |
@@ -265,6 +407,9 @@ articles/<slug>/
 ├── brief.md, briefs/<platform>.*  briefs                                              commit
 ├── evidence.md / .json            claim → evidence map                                commit
 ├── research/                      author context, collision, platform snapshot copy   commit
+├── author-input.md                author material (user-authored)                     commit
+├── editorial/                     direction, pattern transfer, voice plan (.json + .md views),
+│                                  voice-sample.md, audit.*; editorial/<platform>/ for more platforms   commit
 ├── screenshot-plan.json / .md     screenshot plan                                     commit
 ├── images/originals/              canonical screenshots (never overwritten)           commit
 ├── images/outputs/<platform>/     platform-specific derivatives                       commit
@@ -273,8 +418,11 @@ articles/<slug>/
 
 `editorial-kit init` adds `.env*` and `.editorial/cache/` to `.gitignore`.
 Every schema (`CanonicalStory`, `PlatformStrategy`, `Publication`,
-`EvidenceRecord`, `ResearchSnapshot`, `ScreenshotPlan`, config, index,
-continuity, reports) carries a `schemaVersion` for future migrations.
+`EvidenceRecord`, `ResearchSnapshot`, `ScreenshotPlan`, `AuthorInput`,
+`StylePreset`, `PatternTransfer`, `EditorialDirection`, `VoicePlan`,
+`EditorialAudit`, config, index, continuity, reports) carries a
+`schemaVersion` for future migrations. Phase 2 added adjacent artifacts only;
+`CanonicalStory` is unchanged, and v1 workspaces stay valid without editorial files.
 
 ## Research ethics and safety
 
@@ -325,15 +473,26 @@ Chromium build (they are skipped, with a warning, when none is found).
 - Electron capture is implemented behind the same interface but **experimental
   and untested** (no Electron app in the test suite).
 - No automatic publishing in v1.
+- The editorial layer checks structure, not quality. VERBATIM/DO NOT USE checks are literal; semantic
+  incorporation of MUST/SHOULD ideas and applied patterns relies on the agent's recorded locations, which the CLI
+  only verifies for existence and excerpt. Paraphrased DO NOT USE violations need agent review. Dryness metrics
+  are lexical heuristics for Russian and English.
+- Author-input item ids are content-derived: editing an item's text makes earlier plan and audit records for it
+  stale (reported, not silently carried over).
 
 ## Deferred (not in v1)
 
 Automatic publishing (Habr, LinkedIn, Telegram), platform authentication
-management, engagement prediction, SEO guarantees, autonomous topic farming,
+management, engagement prediction (no engagement scores, viral probability,
+predicted views or headline CTR, by design), SEO guarantees, autonomous topic farming,
 scraping protected content, AI-generated screenshots, automatic comments.
 Extension points exist for embeddings/semantic clustering, LLM-assisted story
 extraction, diagrams, social cards, carousels and demo videos
 (`images/outputs/<platform>/` keeps derivatives separate from originals).
+
+Not in the editorial layer (Phase 2) either: automatic demo-vault creation, a new
+screenshot automation architecture, video, carousels, new live-research adapters,
+embeddings or external AI APIs, and rewriting previously published articles.
 
 ## License
 

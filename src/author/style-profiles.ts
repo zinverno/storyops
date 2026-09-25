@@ -45,12 +45,15 @@ const ru: StyleProfile = {
   ],
   thresholds: { emDashPer1000: 12, notXButYPer1000: 2, exclamationsPer1000: 3, longSentenceWords: 40, longSentenceShare: 0.15 },
   guidance: [
-    'Write like a developer discussing a real project; concrete over promotional.',
+    'Write like a developer discussing a real project in natural technical Russian; concrete over promotional.',
+    'First person where the author actually made the decision or supplied the experience (author-input.md).',
     'For a continuing series, start from what changed since the previous publication.',
     'Explain architecture through actual engineering problems.',
     'Mention limitations when evidence exists. Never invent experiences, failures, users or adoption.',
+    'No corporate press-release voice, no generic AI marketing, no bureaucratic phrasing, no clichés.',
     'Avoid repetitive "не X, а Y", artificial triads and heavy em-dash use.',
     'Moderate natural humour is fine; no fake drama.',
+    'Author voice outranks the article style preset, the platform strategy and current trends.',
   ],
 };
 

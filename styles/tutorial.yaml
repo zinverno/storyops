@@ -1,0 +1,38 @@
+schemaVersion: 1
+id: tutorial
+version: 1.0.0
+displayName: Tutorial
+description: >-
+  Teaches the reader to do something concrete with verified, runnable steps.
+  The author's project is the example, not the subject.
+perspective: mixed
+narrativeMode: step-by-step
+technicalDepth: high
+contextDepth: minimal
+pacing: steady
+openingBehavior: >-
+  Say what the reader will be able to do at the end and what they need before
+  starting. One short paragraph of motivation at most.
+sectionBehavior: >-
+  Ordered steps; each step has a goal, the code or command, and how to check
+  that it worked.
+codeUsage: central
+visualUsage: supporting
+humorLevel: light
+personalPresence: low
+failureDiscussion: brief
+limitationsBehavior: >-
+  Known pitfalls sit next to the step where they happen; version constraints
+  are stated up front.
+preferredPatterns:
+  - Every command and snippet verified against the repository.
+  - A check after each step.
+  - Common errors and how to recognise them.
+avoidPatterns:
+  - Untested snippets.
+  - Long backstory before the first step.
+  - Steps that skip required setup.
+suitablePublicationTypes:
+  - tutorial
+  - technical-mini-post
+notes: []

@@ -69,6 +69,7 @@ export function renderScaffold(input: RenderInput, options: ScaffoldOptions): st
     ...(plans.length ? ['Future plans (never present as implemented):', ...plans.map((c) => `  - ${c.text}`)] : []),
     ...(unverified.length ? ['Unverified/hypotheses (label as such or omit):', ...unverified.map((c) => `  - ${c.text}`)] : []),
     ...(options.extraNotes ?? []),
+    ...(input.editorialNotes ?? []),
   ].filter((line) => line !== '');
 
   const parts: string[] = [`<!--\n${guidance.join('\n')}\n-->`, ''];

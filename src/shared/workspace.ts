@@ -21,6 +21,8 @@ export interface WorkspacePaths {
   storiesIndex: string;
   projectsDir: string;
   articlesDir: string;
+  /** Workspace-local article style presets (Phase 2 editorial layer). */
+  stylesDir: string;
 }
 
 export function resolveWorkspace(root: string, options: { configFile?: string; editorialDir?: string; articlesDir?: string } = {}): WorkspacePaths {
@@ -42,6 +44,7 @@ export function resolveWorkspace(root: string, options: { configFile?: string; e
     storiesIndex: path.join(editorialDir, 'stories', 'index.json'),
     projectsDir: path.join(editorialDir, 'projects'),
     articlesDir,
+    stylesDir: path.join(editorialDir, 'styles'),
   };
 }
 
@@ -59,6 +62,10 @@ export interface ArticlePaths {
   screenshotPlan: string;
   screenshotPlanMd: string;
   outputsDir: string;
+  /** User-authored editorial material (author-input.md). */
+  authorInput: string;
+  /** Derived editorial state (direction, pattern transfer, voice plan, audit). */
+  editorialDir: string;
   output(platformId: string): string;
   imageOutputs(platformId: string): string;
 }
@@ -79,6 +86,8 @@ export function articlePaths(workspace: WorkspacePaths, slug: string): ArticlePa
     screenshotPlan: path.join(dir, 'screenshot-plan.json'),
     screenshotPlanMd: path.join(dir, 'screenshot-plan.md'),
     outputsDir: path.join(dir, 'outputs'),
+    authorInput: path.join(dir, 'author-input.md'),
+    editorialDir: path.join(dir, 'editorial'),
     output: (platformId) => path.join(dir, 'outputs', `${platformId}.md`),
     imageOutputs: (platformId) => path.join(dir, 'images', 'outputs', platformId),
   };

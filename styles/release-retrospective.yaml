@@ -1,0 +1,39 @@
+schemaVersion: 1
+id: release-retrospective
+version: 1.0.0
+displayName: Release retrospective
+description: >-
+  A look back at a release or a period of work: what was planned, what
+  shipped, what changed along the way and what the author learned. Organised
+  around a few themes, not the changelog.
+perspective: first-person
+narrativeMode: retrospective
+technicalDepth: moderate
+contextDepth: moderate
+pacing: steady
+openingBehavior: >-
+  Open with what the release changed for the project as a whole (one concrete
+  consequence), not with a list of features.
+sectionBehavior: >-
+  Two to four themes, each with its evidence (commits, tags, tests), including
+  one thing that did not go as planned when the evidence shows it.
+codeUsage: sparing
+visualUsage: supporting
+humorLevel: light
+personalPresence: moderate
+failureDiscussion: honest
+limitationsBehavior: >-
+  What slipped or remains unfinished is named; future plans are labelled.
+preferredPatterns:
+  - Themes instead of the changelog order.
+  - Plan vs reality, from evidence.
+avoidPatterns:
+  - Retelling the changelog.
+  - Presenting plans as shipped.
+  - Metrics without measurement method.
+suitablePublicationTypes:
+  - release-retrospective
+  - product-update
+  - short-project-update
+  - engineering-story
+notes: []

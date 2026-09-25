@@ -1,0 +1,45 @@
+schemaVersion: 1
+id: architecture-deep-dive
+version: 1.0.0
+displayName: Architecture deep dive
+description: >-
+  Architecture-first explanation of a system: its model, contracts and
+  trade-offs. Higher technical density, more diagrams, less personal
+  narrative. Still explains architecture through the problems it solves.
+perspective: mixed
+narrativeMode: architecture-first
+technicalDepth: very-high
+contextDepth: moderate
+pacing: deliberate
+openingBehavior: >-
+  State the design question the architecture answers and why the previous
+  shape stopped working, then show the overall model (often a diagram) early.
+sectionBehavior: >-
+  Sections follow the system's concepts and boundaries (model, contracts,
+  data flow, failure modes), each motivated by the concrete constraint that
+  shaped it.
+codeUsage: supporting
+visualUsage: central
+humorLevel: none
+personalPresence: low
+failureDiscussion: brief
+limitationsBehavior: >-
+  Trade-offs and limits are part of each design section ("what this costs"),
+  plus an explicit list of known limitations where evidence exists.
+preferredPatterns:
+  - One overview diagram before the details.
+  - Contracts and invariants stated precisely.
+  - Trade-offs named next to each decision, with the rejected alternative.
+  - Failure modes and consistency guarantees made explicit.
+avoidPatterns:
+  - Personal anecdotes that do not explain a decision.
+  - Listing modules without the constraint that justifies them.
+  - Diagrams that restate the text without adding structure.
+  - Performance claims without measurements.
+suitablePublicationTypes:
+  - architecture-deep-dive
+  - engineering-story
+  - migration-story
+  - refactor-story
+  - tutorial
+notes: []
