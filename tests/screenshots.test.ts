@@ -5,9 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resolveChromiumExecutable } from '../src/screenshots/browser.js';
 import { captureScreenshots, describeLaunch } from '../src/screenshots/capture.js';
-import { planFromStory, renderPlanMarkdown } from '../src/screenshots/plan.js';
 import { imageManifestSchema, screenshotPlanSchema, type ScreenshotPlan } from '../src/screenshots/schema.js';
-import { canonicalStorySchema } from '../src/stories/schema.js';
 import { memoryLogger, silentLogger } from '../src/shared/logger.js';
 import { clock, FIXTURES, ROOT, tempDir } from './helpers.js';
 
@@ -31,16 +29,7 @@ if (!hasBrowser && process.env.EDITORIAL_REQUIRE_BROWSER === '1') {
 }
 if (!hasBrowser) console.warn('screenshots.test.ts: no Chromium found; Playwright capture tests are SKIPPED. Run `npx playwright install chromium`.');
 
-describe('screenshot planning', () => {
-  it('derives a plan with narrative purpose from the story', async () => {
-    const story = canonicalStorySchema.parse(JSON.parse(await readFile(path.join(ROOT, 'examples/canonical-story.example.json'), 'utf8')));
-    story.possibleVisuals.push({ id: 'health-dashboard', kind: 'screenshot', description: 'Health overview', purpose: 'Show the entry point', supports: 'design', target: '/' });
-    const plan = planFromStory(story, 'http://localhost:4000');
-    expect(plan.steps).toHaveLength(1);
-    expect(plan.steps[0]).toMatchObject({ name: 'health-dashboard', path: '/', screenshot: '01-health-dashboard.png', purpose: 'Show the entry point' });
-    expect(renderPlanMarkdown(plan)).toMatch(/Purpose:\nShow the entry point/);
-  });
-
+describe('screenshot plans (authored by the user)', () => {
   it('validates the example plan and rejects unsafe file names', async () => {
     const example = JSON.parse(await readFile(path.join(ROOT, 'examples/screenshot-plan.example.json'), 'utf8'));
     expect(screenshotPlanSchema.safeParse(example).success).toBe(true);

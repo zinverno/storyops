@@ -27,13 +27,13 @@ async function fixtureFetch(robots = 'User-agent: *\nDisallow: /search\n') {
 
 describe('robots.txt', () => {
   it('applies longest-match precedence, wildcards and agent groups', () => {
-    const rules = parseRobots('User-agent: *\nDisallow: /private\nAllow: /private/public\nDisallow: /*.json$\n\nUser-agent: other\nDisallow: /', 'editorial-kit');
+    const rules = parseRobots('User-agent: *\nDisallow: /private\nAllow: /private/public\nDisallow: /*.json$\n\nUser-agent: other\nDisallow: /', 'storyops');
     expect(isAllowed(rules, '/private/x')).toBe(false);
     expect(isAllowed(rules, '/private/public/x')).toBe(true);
     expect(isAllowed(rules, '/data.json')).toBe(false);
     expect(isAllowed(rules, '/data.json?x=1')).toBe(true);
     expect(isAllowed(rules, '/articles/')).toBe(true);
-    const specific = parseRobots('User-agent: editorial-kit\nDisallow: /\nCrawl-delay: 5\n\nUser-agent: *\nAllow: /', 'editorial-kit/0.1');
+    const specific = parseRobots('User-agent: storyops\nDisallow: /\nCrawl-delay: 5\n\nUser-agent: *\nAllow: /', 'storyops/0.3');
     expect(isAllowed(specific, '/anything')).toBe(false);
     expect(specific.crawlDelaySeconds).toBe(5);
   });
@@ -48,6 +48,29 @@ describe('HttpClient', () => {
 
   const client = (fetchImpl: typeof fetch, extra: Partial<ConstructorParameters<typeof HttpClient>[0]> = {}) =>
     new HttpClient({ cache: new HttpCache(tmp.dir, 24), clock, logger: silentLogger, minDelayMs: 0, concurrency: 2, timeoutMs: 1000, fetchImpl, sleep: async () => undefined, ...extra });
+
+  it('revalidates stale entries with ETag/Last-Modified instead of re-downloading unchanged pages', async () => {
+    const seen: Array<Record<string, string>> = [];
+    let downloads = 0;
+    const impl = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.endsWith('/robots.txt')) return new Response('User-agent: *\nAllow: /\n', { status: 200 });
+      const headers = Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>).map(([k, v]) => [k.toLowerCase(), v]));
+      seen.push(headers);
+      if (headers['if-none-match'] === '"v1"') return new Response(null, { status: 304 });
+      downloads += 1;
+      return new Response('<html>body</html>', { status: 200, headers: { etag: '"v1"', 'last-modified': 'Tue, 22 Sep 2026 10:00:00 GMT' } });
+    }) as typeof fetch;
+    const url = 'https://habr.com/ru/articles/1/';
+    const first = await client(impl).get('habr', url);
+    expect(first.fromCache).toBe(false);
+    // One day later the entry is stale (TTL 24h): a conditional request is sent and answered with 304.
+    const later = fixedClock('2026-09-25T13:00:00.000Z');
+    const second = await client(impl, { clock: later }).get('habr', url);
+    expect(second).toMatchObject({ revalidated: true, fromCache: false, body: '<html>body</html>', fetchedAt: '2026-09-25T13:00:00.000Z' });
+    expect(seen[1]).toMatchObject({ 'if-none-match': '"v1"', 'if-modified-since': 'Tue, 22 Sep 2026 10:00:00 GMT' });
+    expect(downloads).toBe(1);
+  });
 
   it('caches responses and does not refetch fresh entries', async () => {
     const { impl, calls } = await fixtureFetch();

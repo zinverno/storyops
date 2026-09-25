@@ -9,17 +9,45 @@ import { ROOT, tempDir } from './helpers.js';
 describe('bundled Agent Skills', () => {
   it('are valid per the Agent Skills specification', async () => {
     const reports = await validateSkillsDir(path.join(ROOT, 'skills'));
-    expect(reports.map((r) => r.name)).toEqual(['editorial-author', 'editorial-research', 'product-screenshots']);
+    expect(reports.map((r) => r.name)).toEqual(['product-screenshots', 'storyops-opportunity', 'storyops-research', 'storyops-review']);
     for (const r of reports) expect(r.issues).toEqual([]);
   });
 
   it('keep SKILL.md compact and use only spec frontmatter fields', async () => {
-    for (const name of ['editorial-author', 'editorial-research', 'product-screenshots']) {
+    for (const name of ['product-screenshots', 'storyops-opportunity', 'storyops-research', 'storyops-review']) {
       const src = await readFile(path.join(ROOT, 'skills', name, 'SKILL.md'), 'utf8');
       const doc = parseFrontmatter(src);
       expect(Object.keys(doc.data).sort()).toEqual(['compatibility', 'description', 'license', 'metadata', 'name']);
       expect(doc.body.split('\n').length).toBeLessThan(200);
       expect(src).not.toMatch(/~\/\.claude|\.claude\/skills/); // no client-specific paths inside skill logic
+    }
+  });
+
+  it('encode the product principle: StoryOps analyses, the human writes', async () => {
+    const REFUSAL = 'I can research the topic, show evidence and review a draft you write.';
+    for (const name of ['storyops-research', 'storyops-opportunity', 'storyops-review']) {
+      const src = await readFile(path.join(ROOT, 'skills', name, 'SKILL.md'), 'utf8');
+      expect(src, name).toContain(REFUSAL);
+      expect(src, name).toMatch(/The human writes|the author writes/i);
+      // No generation workflow survives in any skill.
+      expect(src, name).not.toMatch(/editorial-kit|repurpose\s+\S+\.json|story create|voice plan|draft workspace|editorial plan/i);
+    }
+    const review = await readFile(path.join(ROOT, 'skills', 'storyops-review', 'SKILL.md'), 'utf8');
+    expect(review).toMatch(/Never[\s\S]*rewrite the article/);
+    expect(review).toMatch(/Possible issue/);
+    // The imperative form appears only as the forbidden example.
+    expect(review.match(/You must rewrite/g)).toHaveLength(1);
+    expect(review).toMatch(/Never "You must rewrite this as"/);
+    const opportunity = await readFile(path.join(ROOT, 'skills', 'storyops-opportunity', 'SKILL.md'), 'utf8');
+    expect(opportunity).toMatch(/never ranks topics/i);
+    expect(opportunity).toMatch(/Never: "best topic"/);
+    const research = await readFile(path.join(ROOT, 'skills', 'storyops-research', 'SKILL.md'), 'utf8');
+    expect(research).toMatch(/Observed pattern \/ Evidence \/ Strength \/ Possible relevance/);
+    for (const name of ['product-screenshots', 'storyops-opportunity', 'storyops-research', 'storyops-review']) {
+      for (const file of await readdir(path.join(ROOT, 'skills', name, 'references'))) {
+        const ref = await readFile(path.join(ROOT, 'skills', name, 'references', file), 'utf8');
+        expect(ref, `${name}/${file}`).not.toMatch(/editorial-kit|canonical story|story\.json|voice plan|brief\.md/i);
+      }
     }
   });
 
@@ -45,11 +73,11 @@ describe('bundled Agent Skills', () => {
     try {
       const target = path.join(tmp.dir, 'skills-out');
       const r = await installSkills(path.join(ROOT, 'skills'), target);
-      expect(r.installed).toEqual(expect.arrayContaining(['editorial-author', 'editorial-research', 'product-screenshots']));
-      expect(await readdir(path.join(target, 'editorial-author', 'references'))).toContain('workflow.md');
+      expect(r.installed).toEqual(expect.arrayContaining(['product-screenshots', 'storyops-opportunity', 'storyops-research', 'storyops-review']));
+      expect(await readdir(path.join(target, 'storyops-review', 'references'))).toContain('boundaries.md');
       const again = await installSkills(path.join(ROOT, 'skills'), target);
       expect(again.installed).toEqual([]);
-      expect(again.skipped).toHaveLength(3);
+      expect(again.skipped).toHaveLength(4);
     } finally {
       await tmp.cleanup();
     }
@@ -89,7 +117,7 @@ describe('bundled Agent Skills', () => {
         expect(target).toBe(path.join(codexHome, 'skills'));
         const r = await installSkills(path.join(ROOT, 'skills'), target);
         expect(r.target).toBe(path.join(codexHome, 'skills'));
-        expect((await readdir(path.join(codexHome, 'skills'))).sort()).toEqual(['editorial-author', 'editorial-research', 'product-screenshots']);
+        expect((await readdir(path.join(codexHome, 'skills'))).sort()).toEqual(['product-screenshots', 'storyops-opportunity', 'storyops-research', 'storyops-review']);
         expect(resolveInstallTarget({ target: 'rel/skills', projectRoot: project })).toBe('/work/project/rel/skills');
       } finally {
         await tmp.cleanup();

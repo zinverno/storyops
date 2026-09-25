@@ -1,87 +1,82 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { runDemo, type DemoResult } from '../src/demo/run.js';
-import { parseFrontmatter } from '../src/shared/frontmatter.js';
-import { tempDir } from './helpers.js';
+import { sha256 } from '../src/shared/hash.js';
+import { FIXTURES, tempDir } from './helpers.js';
 
-describe('offline end-to-end fixture scenario', () => {
+describe('offline intelligence demo (end to end)', () => {
   let result: DemoResult;
   let cleanup: () => Promise<void>;
 
   beforeAll(async () => {
-    const tmp = await tempDir('editorial-demo-');
+    const tmp = await tempDir('storyops-demo-');
     cleanup = tmp.cleanup;
     result = await runDemo(tmp.dir);
   }, 120_000);
   afterAll(async () => cleanup?.());
 
-  it('knows what was already covered: project origin and original architecture', () => {
-    const covered = result.summary.alreadyCovered.join('\n');
-    expect(covered).toMatch(/project origin/);
-    expect(covered).toMatch(/original architecture/);
-    expect(covered).toMatch(/разовый аудит/);
+  it('repository: a new reconciliation subsystem and a bug fix', () => {
+    expect(result.events.find((e) => e.type === 'new-subsystem' && e.subsystem === 'src/reconciliation')?.evidenceStrength).toBe('strong');
+    expect(result.events.some((e) => e.type === 'bug-fix' && e.subsystem === 'src/reconciliation')).toBe(true);
   });
 
-  it('finds architecture evolution and new, undiscussed subsystems as the narrative gap', () => {
-    expect(result.gap.headline).toMatch(/Architecture evolved/);
-    const arch = result.gap.gaps.find((g) => g.kind === 'architecture-evolution');
-    expect(arch?.strength).toBe('strong');
-    expect(arch?.title).toMatch(/audit → /);
-    const subsystems = result.gap.gaps.filter((g) => g.kind === 'new-subsystem').map((g) => g.title);
-    expect(subsystems.some((t) => t.includes('src/knowledge'))).toBe(true);
-    expect(subsystems.some((t) => t.includes('src/health'))).toBe(true);
-    expect(result.gap.gaps.some((g) => g.kind === 'migration')).toBe(true);
-    expect(result.gap.gaps.some((g) => g.kind === 'removed-approach' && g.title.includes('src/audit'))).toBe(true);
+  it('author archive: reconciliation not covered; the old architecture deeply covered', () => {
+    const by = (id: string) => result.coverage.find((c) => c.topicId === id)!;
+    expect(by('reconciliation').level).toBe('not-covered');
+    expect(by('audit').level).toBe('deeply-covered');
+    expect(by('finding-lifecycle').level).toBe('mentioned'); // a brief Telegram note
   });
 
-  it('flags the generic "AI in project" angle as saturated', () => {
-    expect(result.genericCollision.saturatedAngles.some((a) => /AI/.test(a.label))).toBe(true);
-    expect(result.genericCollision.summary.join(' ')).toMatch(/Saturated angle/);
+  it('platform: the generic AI framing is highly saturated and rising; the related database theme is moderately active', () => {
+    expect(result.aiSaturation.state).toBe('highly-saturated');
+    expect(result.aiTrend.direction).toBe('rising');
+    expect(result.aiTrend.basis).toBe('research-runs');
+    const reconciliation = result.opportunities.candidates.find((c) => c.id === 'reconciliation')!;
+    expect(reconciliation.platform?.primary).toMatchObject({ topicId: 'databases', relation: 'related', state: 'active', activity: 'medium' });
   });
 
-  it('reports the unique contribution as architecture evolution backed by code and tests', () => {
-    expect(result.summary.uniqueContribution.join('\n')).toMatch(/Architecture evolved.*test file/s);
+  it('opportunities: reconciliation is novel with no overlap; the generic AI plugin angle is crowded; no ranking', () => {
+    const reconciliation = result.opportunities.candidates.find((c) => c.id === 'reconciliation')!;
+    expect(reconciliation.dimensions.repositoryNovelty.level).toBe('high');
+    expect(reconciliation.dimensions.authorOverlap.level).toBe('none');
+    expect(reconciliation.quadrant).toBe('active opportunity');
+    expect(result.opportunities.candidates.find((c) => c.id === 'audit')!.dimensions.authorOverlap.level).toBe('high');
+    const generic = result.comparison[1]!;
+    expect(generic.dimensions.saturation.state).toBe('highly-saturated');
+    expect(generic.dimensions.repositoryNovelty.level).toBe('low');
+    expect(generic.quadrant).toBe('crowded/repetitive');
+    expect(result.opportunities.notice).toMatch(/does not choose topics/);
+    expect(result.dossier.questions.length).toBeGreaterThan(0);
   });
 
-  it('observes that higher-momentum articles expose the technical conflict early', () => {
-    const ids = result.snapshot.observations.map((o) => o.id);
-    expect(ids).toContain('body-conflict-early');
-    expect(result.summary.trendObservations.length).toBeGreaterThan(0);
-    expect(result.snapshot.sampleSize).toBe(11);
+  it('review: flags the unsupported performance claim, the duplicated paragraph and the awkward phrase', () => {
+    const f = result.review.findings;
+    const claim = f.find((x) => x.evidence?.status === 'unsupported')!;
+    expect(claim.excerpt).toMatch(/в 3 раза быстрее/);
+    expect(f.find((x) => x.rule === 'near-duplicate-paragraphs')).toBeDefined();
+    expect(f.find((x) => x.rule === 'bureaucratic-enable')).toMatchObject({ excerpt: 'Данная система позволяет осуществлять анализ', alternative: 'Система анализирует' });
+    expect(f.find((x) => x.category === 'logic')?.rule).toBe('absolute-vs-qualified');
   });
 
-  it('recommends packaging from continuity and the architecture limitation, not from zero', () => {
-    const packaging = result.summary.recommendedPackaging.join('\n');
-    expect(packaging).toMatch(/Do not reintroduce the project from zero/);
-    expect(packaging).toMatch(/limitation of the previous architecture/);
-    expect(packaging).toMatch(/\(advisory\).*\[trend-observation\]/);
+  it('the article file is byte-identical to the human-written fixture', async () => {
+    expect(result.article.hashAfter).toBe(result.article.hashBefore);
+    expect(sha256(await readFile(result.article.file))).toBe(sha256(await readFile(path.join(FIXTURES, 'review/article.md'))));
   });
 
-  it('derives every platform output from the same canonical story', async () => {
-    expect(Object.keys(result.outputs).sort()).toEqual(['habr', 'linkedin', 'medium', 'telegram']);
-    for (const [platform, file] of Object.entries(result.outputs)) {
-      const doc = parseFrontmatter(await readFile(file, 'utf8'));
-      expect(doc.data.platform).toBe(platform);
-      expect(doc.data.story).toBe('notegarden-health-model');
-      expect(doc.body).toContain('story.json');
+  it('generates no article or draft artifact', () => {
+    for (const f of result.writtenFiles) {
+      expect(f).not.toMatch(/(^|\/)(article|draft)[^/]*\.md$/i);
+      expect(f).not.toMatch(/(^|\/)(outputs|drafts|articles)\//);
+      expect(f).not.toMatch(/story\.json$|voice-plan|brief\.md/);
     }
-    const story = JSON.parse(await readFile(result.storyFile, 'utf8'));
-    expect(story.outputs.map((o: { platform: string }) => o.platform).sort()).toEqual(['habr', 'linkedin', 'medium', 'telegram']);
+    expect(result.writtenFiles).toEqual(expect.arrayContaining(['topics/opportunities.md', 'topics/opportunities.json', 'topics/reconciliation/dossier.md', 'reviews/article-2026-09-24/review.json', 'reviews/article-2026-09-24/review.md', '.storyops/storyops.db']));
   });
 
-  it('maps every verified claim to repository evidence and is ready for drafting', () => {
-    expect(result.evidence.issues.filter((i) => i.severity === 'error')).toEqual([]);
-    const verified = result.evidence.claims.filter((c) => c.classification === 'verified-fact');
-    expect(verified.length).toBeGreaterThan(0);
-    expect(verified.every((c) => c.status === 'supported')).toBe(true);
-    expect(result.briefs.habr!.readiness.readyForDrafting).toBe(true);
-  });
-
-  it('writes the human-readable demo summary and continuity artifacts', async () => {
+  it('writes a readable summary', async () => {
     const summary = await readFile(result.summaryFile, 'utf8');
-    expect(summary).toMatch(/## Narrative gap/);
-    const continuity = await readFile(path.join(result.root, '.editorial/continuity.md'), 'utf8');
-    expect(continuity).toMatch(/Continuity map/);
+    expect(summary).toMatch(/StoryOps analyses; the human writes/);
+    expect(summary).toMatch(/article\.md unchanged/);
+    expect(summary).toMatch(/No article or draft was generated/);
   });
 });
