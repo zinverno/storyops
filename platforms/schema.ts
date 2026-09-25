@@ -151,6 +151,8 @@ export interface RenderInput {
   strategy: PlatformStrategy;
   publicationType: PublicationType;
   storyPath: string;
+  /** Notes about the Phase 2 editorial plan (or its absence), shown in the scaffold guidance. */
+  editorialNotes?: string[];
 }
 
 /** Optional renderer producing the platform-specific draft workspace. */

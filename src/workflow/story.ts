@@ -19,6 +19,7 @@ import type { CanonicalStory } from '../stories/schema.js';
 import { loadStory, saveStory } from '../stories/store.js';
 import { mdList } from '../shared/markdown.js';
 import { loadContinuity, requireContinuity } from './author.js';
+import { editorialStatus } from './editorial.js';
 import type { AppContext } from './context.js';
 import { loadNarrativeGap, loadProjectReport, narrativeGapWorkflow, requireProject } from './project.js';
 import { collisionWorkflow, latestSnapshots } from './research.js';
@@ -153,7 +154,7 @@ export async function briefWorkflow(ctx: AppContext, storyFile: string, platform
  * Repurpose = re-read the canonical story + apply the target platform
  * strategy. It never reads another platform's output.
  */
-export async function repurposeWorkflow(ctx: AppContext, storyFile: string, platformId: string, options: { type?: string; force?: boolean; primary?: boolean } = {}): Promise<{ output: string; brief: Brief }> {
+export async function repurposeWorkflow(ctx: AppContext, storyFile: string, platformId: string, options: { type?: string; force?: boolean; primary?: boolean } = {}): Promise<{ output: string; brief: Brief; editorialPlan: { planned: boolean; dir: string } }> {
   const { brief } = await briefWorkflow(ctx, storyFile, platformId, options);
   const story = await loadStory(storyFile);
   const module = ctx.registry.get(platformId);
@@ -167,14 +168,28 @@ export async function repurposeWorkflow(ctx: AppContext, storyFile: string, plat
     }
   }
   const renderer = module.renderer ?? defaultRenderer;
-  await writeText(out, renderer.render({ story, strategy: module.strategy, publicationType: type, storyPath: storyFile }));
+  const editorial = await editorialStatus(storyFile, platformId);
+  const editorialRel = path.relative(path.dirname(storyFile), editorial.dir).split(path.sep).join('/');
+  const editorialNotes = editorial.planned
+    ? [
+        `Editorial plan: ${editorialRel}/direction.md, ${editorialRel}/voice-plan.md, ${editorialRel}/pattern-transfer.md; author material: author-input.md.`,
+        'Write from the voice plan. The sections below are a fact checklist, not a template: do not mirror story.json field by field.',
+        `After drafting: editorial-kit editorial audit --story <story.json> --platform ${platformId} --output <this file>`,
+      ]
+    : [
+        `No editorial plan exists for ${platformId} (${editorialRel}/direction.json). For long-form prose, run`,
+        `  editorial-kit editorial plan --story <story.json> --platform ${platformId} --style <style>`,
+        'first: drafting straight from story.json and the brief tends to produce documentation-like text.',
+      ];
+  await writeText(out, renderer.render({ story, strategy: module.strategy, publicationType: type, storyPath: storyFile, editorialNotes }));
+  if (!editorial.planned) ctx.logger.info(`No editorial plan for ${platformId}; the draft workspace is a fact checklist only.`);
   await ensureDir(paths.imageOutputs(platformId));
   const now = ctx.clock.now().toISOString();
   const rel = path.relative(path.dirname(storyFile), out).split(path.sep).join('/');
   story.outputs = [...story.outputs.filter((o) => o.platform !== platformId), { platform: platformId, path: rel, publicationType: type, createdAt: now }];
   await saveStory(ctx.workspace, storyFile, story);
   ctx.logger.info(`${module.strategy.displayName} draft workspace: ${out}`);
-  return { output: out, brief };
+  return { output: out, brief, editorialPlan: editorial };
 }
 
 /** `create`: story skeleton + evidence + brief + output scaffold for the first platform. */

@@ -17,6 +17,7 @@ import { validateSkillsDir } from '../skills/validate.js';
 import { loadStory } from '../stories/store.js';
 import { validateStory } from '../stories/validate.js';
 import { runDemo } from '../demo/run.js';
+import { runEditorialDemo } from '../demo/editorial.js';
 import { packageRoot } from '../demo/paths.js';
 import { authorSync, importPublication, rebuildAuthorMemory } from '../workflow/author.js';
 import { loadContext, type AppContext } from '../workflow/context.js';
@@ -26,6 +27,9 @@ import { inspectProjectWorkflow, narrativeGapWorkflow, requireProject } from '..
 import { collisionWorkflow, researchWorkflow } from '../workflow/research.js';
 import { screenshotCaptureWorkflow, screenshotPlanWorkflow } from '../workflow/screenshots.js';
 import { briefWorkflow, createWorkflow, evidenceWorkflow, repurposeWorkflow, storyCreateWorkflow } from '../workflow/story.js';
+import { editorialAuditWorkflow, editorialPlanWorkflow, editorialValidateWorkflow, inputAddWorkflow, inputInitWorkflow, loadAuthorInput, loadStyles } from '../workflow/editorial.js';
+import { abbreviate, itemsByPriority, materialPrioritySchema, type MaterialPriority } from '../editorial/author-input.js';
+import { renderStylePreset } from '../editorial/styles.js';
 
 interface GlobalOptions {
   cwd?: string;
@@ -311,7 +315,14 @@ program
   .action(async (file: string, o: { platform: string; type?: string; force?: boolean }) => {
     const c = await ctx();
     const r = await repurposeWorkflow(c, path.resolve(file), o.platform, { ...(o.type ? { type: o.type } : {}), ...(o.force ? { force: true } : {}) });
-    out({ output: r.output, brief: r.brief }, [`Draft workspace: ${rel(r.output)}`, `Brief: ${rel(path.join(path.dirname(path.resolve(file)), 'briefs', `${o.platform}.md`))}`, r.brief.readiness.readyForDrafting ? 'Ready for drafting.' : 'NOT ready for drafting (see brief).']);
+    out({ output: r.output, brief: r.brief, editorialPlan: r.editorialPlan }, [
+      `Draft workspace: ${rel(r.output)}`,
+      `Brief: ${rel(path.join(path.dirname(path.resolve(file)), 'briefs', `${o.platform}.md`))}`,
+      r.brief.readiness.readyForDrafting ? 'Ready for drafting.' : 'NOT ready for drafting (see brief).',
+      r.editorialPlan.planned
+        ? `Editorial plan: ${rel(r.editorialPlan.dir)} (write from the voice plan; audit with \`editorial-kit editorial audit\`).`
+        : `No editorial plan for ${o.platform} (${rel(r.editorialPlan.dir)}/direction.json missing). For long-form prose run \`editorial-kit editorial plan --story ${rel(path.resolve(file))} --platform ${o.platform}\` first.`,
+    ]);
   });
 
 program
@@ -327,6 +338,137 @@ program
     const c = await ctx();
     const r = await createWorkflow(c, { topic: o.topic, platform: o.platform, ...(o.project ? { projectId: o.project } : {}), ...(o.slug ? { slug: o.slug } : {}), ...(o.type ? { type: o.type } : {}), ...(o.force ? { force: true } : {}) });
     out(r, [`Story: ${rel(r.storyFile)}`, `Draft workspace: ${rel(r.output)}`, r.brief.readiness.readyForDrafting ? 'Ready for drafting.' : `NOT ready for drafting yet — complete the story from evidence:\n${r.brief.readiness.blockers.map((b) => `- ${b}`).join('\n')}`]);
+  });
+
+// ---------------------------------------------------- editorial layer (Phase 2)
+const input = program.command('input').description('author input: raw thoughts, phrases, anecdotes and jokes for an article (articles/<slug>/author-input.md)');
+input
+  .command('init')
+  .description('create author-input.md next to the story (an empty template is valid)')
+  .requiredOption('-s, --story <file>', 'path to story.json')
+  .option('--force', 'replace an existing author-input.md with an empty template')
+  .action(async (o: { story: string; force?: boolean }) => {
+    const r = await inputInitWorkflow(path.resolve(o.story), o.force ? { force: true } : {});
+    out(r, r.created ? `Author input: ${rel(r.file)} (edit it freely; no section is required).` : `Kept existing ${rel(r.file)} (use --force to replace it).`);
+  });
+input
+  .command('add')
+  .description('append one item to a section of author-input.md (the Markdown file stays the source of truth)')
+  .requiredOption('-s, --story <file>', 'path to story.json')
+  .addOption(new Option('--priority <priority>', 'section: verbatim (exact phrase), must, should, may, background, avoid (do not use)').choices(materialPrioritySchema.options).makeOptionMandatory())
+  .requiredOption('--text <text>', 'the item (quote it in the shell; multi-line text is fine)')
+  .action(async (o: { story: string; priority: MaterialPriority; text: string }) => {
+    const r = await inputAddWorkflow(path.resolve(o.story), o.priority, o.text);
+    out({ file: r.file, item: r.item }, `Added ${o.priority.toUpperCase()} item ${r.item.id} to ${rel(r.file)}.`);
+  });
+input
+  .command('show')
+  .description('show the parsed author input (items per priority, ids, issues)')
+  .requiredOption('-s, --story <file>', 'path to story.json')
+  .action(async (o: { story: string }) => {
+    const story = await loadStory(path.resolve(o.story));
+    const parsed = await loadAuthorInput(path.resolve(o.story), story.slug);
+    if (!parsed) return out({ items: [] }, 'No author-input.md yet (`editorial-kit input init --story …`).');
+    const by = itemsByPriority(parsed);
+    out(parsed, [
+      ...Object.entries(by).filter(([, items]) => items.length).flatMap(([p, items]) => [`${p.toUpperCase()} (${items.length})`, ...items.map((i) => `  ${i.id}  ${abbreviate(i.text, 100)}`)]),
+      ...(parsed.items.length ? [] : ['(empty)']),
+      ...parsed.issues.map((i) => `${i.severity}: ${i.line ? `line ${i.line}: ` : ''}${i.message}`),
+    ]);
+    if (parsed.issues.some((i) => i.severity === 'error')) process.exitCode = 1;
+  });
+
+async function stylesCtx(): Promise<Pick<AppContext, 'workspace'>> {
+  try {
+    return await ctx();
+  } catch {
+    return { workspace: resolveWorkspace(root()) };
+  }
+}
+
+const styles = program.command('styles').description('article style presets (what kind of piece: engineering story, dev diary, postmortem…)');
+styles
+  .command('list')
+  .description('list built-in and workspace (.editorial/styles/) presets')
+  .action(async () => {
+    const catalog = await loadStyles(await stylesCtx());
+    const rows = catalog.list().map((s) => ({ id: s.preset.id, version: s.preset.version, source: s.source, displayName: s.preset.displayName, suitablePublicationTypes: s.preset.suitablePublicationTypes }));
+    out({ styles: rows, issues: catalog.issues }, [...rows.map((r) => `${r.id.padEnd(24)} ${r.version.padEnd(7)} ${r.source.padEnd(9)} ${r.displayName}`), ...catalog.issues.map((i) => `${i.severity}: ${rel(i.file)}: ${i.message}`)]);
+    if (catalog.issues.some((i) => i.severity === 'error')) process.exitCode = 1;
+  });
+styles
+  .command('show <id>')
+  .description('print one style preset')
+  .action(async (id: string) => {
+    const style = (await loadStyles(await stylesCtx())).get(id);
+    out(style, renderStylePreset(style));
+  });
+styles
+  .command('validate')
+  .description('validate every preset (schema, id = file name, no duplicate ids)')
+  .action(async () => {
+    const catalog = await loadStyles(await stylesCtx());
+    out({ valid: catalog.ids(), issues: catalog.issues }, [`${catalog.ids().length} valid style(s): ${catalog.ids().join(', ')}`, ...catalog.issues.map((i) => `${i.severity}: ${rel(i.file)}: ${i.message}`)]);
+    if (catalog.issues.some((i) => i.severity === 'error')) process.exitCode = 1;
+  });
+
+const editorial = program.command('editorial').description('editorial layer between facts and prose: direction, pattern transfer, voice plan, audit');
+editorial
+  .command('plan')
+  .description('create or refresh author-input.md (if missing), editorial/direction.*, editorial/pattern-transfer.*, editorial/voice-plan.* (deterministic scaffolds; the agent fills the decisions)')
+  .requiredOption('-s, --story <file>', 'path to story.json')
+  .requiredOption('-p, --platform <id>', 'platform id')
+  .option('--style <id>', 'article style preset (see `styles list`)')
+  .option('--type <publicationType>', 'publication type (default: the brief\'s, else the platform default)')
+  .option('--reset', 'discard existing editorial decisions and start from fresh scaffolds')
+  .action(async (o: { story: string; platform: string; style?: string; type?: string; reset?: boolean }) => {
+    const c = await ctx();
+    const r = await editorialPlanWorkflow(c, path.resolve(o.story), o.platform, { ...(o.style ? { style: o.style } : {}), ...(o.type ? { type: o.type } : {}), ...(o.reset ? { reset: true } : {}) });
+    const d = r.plan.direction;
+    out(
+      { files: r.files, reviewRequired: r.reviewRequired, style: d.style, publicationType: d.publicationType, patterns: r.plan.patternTransfer.items.length, authorInput: r.authorInputFile },
+      [
+        `${r.authorInputCreated ? 'Created' : 'Author input'}: ${rel(r.authorInputFile)}`,
+        `Editorial plan (${r.refreshed ? 'refreshed' : 'created'}): ${rel(r.files.dir)}/{direction,pattern-transfer,voice-plan}.{json,md}`,
+        d.style.id ? `Style: ${d.style.id}@${d.style.version} (${d.style.chosenBy ?? '?'}); publication type: ${d.publicationType}` : `Style: NOT SELECTED. Candidates for ${d.publicationType}: ${d.style.candidates.map((x) => x.id).join(', ')}`,
+        `Pattern transfer: ${r.plan.patternTransfer.items.length} observation(s) from ${r.plan.patternTransfer.basedOn.research?.file ?? 'no research snapshot'}; ${r.plan.patternTransfer.items.filter((i) => i.decision === 'pending').length} pending.`,
+        ...r.reviewRequired.map((m) => `REVIEW REQUIRED: ${m}`),
+        'Next: fill the TODO decisions (editorial-author skill), then `editorial-kit editorial validate`.',
+      ],
+    );
+  });
+editorial
+  .command('validate')
+  .description('is the editorial plan complete, consistent and current? (style, decisions, drift, provenance, story/evidence)')
+  .requiredOption('-s, --story <file>', 'path to story.json')
+  .requiredOption('-p, --platform <id>', 'platform id')
+  .action(async (o: { story: string; platform: string }) => {
+    const c = await ctx();
+    const r = await editorialValidateWorkflow(c, path.resolve(o.story), o.platform);
+    out(r, [r.ready ? 'Editorial plan is ready for drafting.' : 'Editorial plan is NOT ready for drafting.', ...r.issues.map((i) => `${i.severity}: [${i.artifact}] ${i.message}`)]);
+    if (!r.ready) process.exitCode = 1;
+  });
+editorial
+  .command('audit')
+  .description('post-draft audit: author material (VERBATIM exact, MUST/SHOULD mapping), DO NOT USE, pattern usage, voice/dryness and style warnings')
+  .requiredOption('-s, --story <file>', 'path to story.json')
+  .requiredOption('-p, --platform <id>', 'platform id')
+  .option('-o, --output <file>', 'draft to audit (default: articles/<slug>/outputs/<platform>.md)')
+  .action(async (o: { story: string; platform: string; output?: string }) => {
+    const c = await ctx();
+    const r = await editorialAuditWorkflow(c, path.resolve(o.story), o.platform, o.output);
+    const s = r.audit.summary;
+    out(r.audit, [
+      `VERBATIM   ${s.verbatim.incorporated}/${s.verbatim.total} incorporated exactly`,
+      `MUST       ${s.must.incorporated}/${s.must.total} incorporated${s.must.omitted ? `, ${s.must.omitted} omitted` : ''}${s.must.unmapped ? `, ${s.must.unmapped} unmapped` : ''}`,
+      `SHOULD     ${s.should.incorporated}/${s.should.total} incorporated${s.should.omitted ? `, ${s.should.omitted} omitted` : ''}${s.should.unmapped ? `, ${s.should.unmapped} unmapped` : ''}`,
+      `MAY        ${s.may.used} used, ${s.may.unused} unused`,
+      `DO NOT USE ${s.avoid.violations ? `${s.avoid.violations} violation(s)` : 'no direct violations detected'}`,
+      `PATTERNS   ${s.patterns.incorporated}/${s.patterns.expected} mapped${s.patterns.overridden ? `, ${s.patterns.overridden} overridden by author` : ''}`,
+      ...r.audit.issues.filter((i) => i.severity !== 'info').map((i) => `${i.severity}: [${i.area}] ${i.message}`),
+      `Audit: ${rel(r.files.audit.md)} (${s.errors} error(s), ${s.warnings} warning(s))`,
+    ]);
+    if (s.errors > 0) process.exitCode = 1;
   });
 
 // ------------------------------------------------------------ screenshots
@@ -440,11 +582,12 @@ skills
 
 program
   .command('demo')
-  .description('run the offline, deterministic fixture scenario end to end (no network, fixed clock)')
+  .description('run the offline, deterministic fixture scenario end to end, including the editorial layer (no network, fixed clock)')
   .option('--out <dir>', 'output directory (must be empty or a previous demo run)', 'editorial-demo')
   .action(async (o: { out: string }) => {
     const r = await runDemo(path.resolve(o.out), { logger: logger() });
-    out(r.summary, [await readFile(r.summaryFile, 'utf8'), `Workspace: ${rel(r.root)}`]);
+    const e = await runEditorialDemo(r.root, { logger: logger() });
+    out({ ...r.summary, editorial: e.summary }, [await readFile(r.summaryFile, 'utf8'), `Workspace: ${rel(r.root)}`]);
   });
 
 program.parseAsync(process.argv).catch((error: unknown) => {
