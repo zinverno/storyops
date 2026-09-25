@@ -1,0 +1,43 @@
+schemaVersion: 1
+id: dev-diary
+version: 1.0.0
+displayName: Dev diary
+description: >-
+  A chronological, informal account of recent work on a project: smaller
+  engineering observations, what was tried, what surprised the author. Strong
+  personal presence, light structure.
+perspective: first-person
+narrativeMode: chronological
+technicalDepth: moderate
+contextDepth: minimal
+pacing: brisk
+openingBehavior: >-
+  Start where the work actually started (the task, the itch, the bug), in the
+  author's own words. No project re-introduction for existing readers.
+sectionBehavior: >-
+  Few or no headings; time-ordered episodes joined by informal transitions.
+  Each episode carries one observation.
+codeUsage: sparing
+visualUsage: sparing
+humorLevel: moderate
+personalPresence: high
+failureDiscussion: honest
+limitationsBehavior: >-
+  Loose ends and unfinished parts are mentioned as they happen; "what next"
+  is fine as a short closing.
+preferredPatterns:
+  - Chronology with small, concrete observations.
+  - Author-supplied reactions and asides (only when the author supplied them).
+  - Informal transitions ("а потом выяснилось…").
+avoidPatterns:
+  - Formal architecture sections.
+  - Invented day-by-day drama or effort ("просидел всю ночь") the author did not report.
+  - Marketing summaries of the project.
+suitablePublicationTypes:
+  - short-project-update
+  - channel-longread
+  - technical-mini-post
+  - engineering-story
+  - product-update
+notes:
+  - Works well for Telegram channels and personal blogs.

@@ -1,0 +1,40 @@
+schemaVersion: 1
+id: product-story
+version: 1.0.0
+displayName: Product story
+description: >-
+  Why a product capability exists, from the user's problem to what changed
+  in the product, with the engineering visible but not dominant. Honest about
+  what is and is not done; no marketing.
+perspective: first-person
+narrativeMode: user-problem-driven
+technicalDepth: moderate
+contextDepth: moderate
+pacing: brisk
+openingBehavior: >-
+  Open with the concrete situation a user (often the author) was in and what
+  did not work. Only use user reports the author actually supplied.
+sectionBehavior: >-
+  Situation, what changed in the product (with screenshots), the one or two
+  engineering decisions that made it possible, what is still missing.
+codeUsage: sparing
+visualUsage: central
+humorLevel: light
+personalPresence: moderate
+failureDiscussion: brief
+limitationsBehavior: >-
+  State plainly what the feature does not do yet; plans are labelled as plans.
+preferredPatterns:
+  - Screenshots of the real UI state the text describes.
+  - Concrete before/after from the user's point of view.
+avoidPatterns:
+  - Feature lists.
+  - Adoption or user numbers without evidence.
+  - Superlatives and promotional tone.
+suitablePublicationTypes:
+  - product-update
+  - technical-announcement
+  - short-project-update
+  - engineering-story
+notes:
+  - On Habr, personal promotional content is against the rules; keep the engineering substance.

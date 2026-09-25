@@ -30,6 +30,7 @@
     "dist/src",
     "dist/platforms",
     "skills",
+    "styles",
     "platforms/**/README.md",
     "examples",
     "fixtures",
