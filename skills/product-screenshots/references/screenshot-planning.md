@@ -1,7 +1,8 @@
 # Screenshot planning
 
-Plan from the canonical story (`possibleVisuals` with `kind: "screenshot"`) and
-the brief ("Screenshots required"). Example `screenshot-plan.md`:
+The plan is written by the author (or with the author): which product states
+the article they are writing needs to show, and why. StoryOps does not derive
+plans from articles or stories. Purposes, for example:
 
 ```
 1. Dashboard

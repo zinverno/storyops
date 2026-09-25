@@ -1,32 +1,30 @@
 ---
 name: product-screenshots
-description: Plans and captures consistent, privacy-safe product screenshots with Playwright for technical articles. Derives a screenshot plan from the canonical story (each shot has a narrative purpose), starts the local app, navigates to the exact UI state, masks private data, blocks captures whose DOM text or form values look like secrets (pixels are not scanned, so every image needs visual review), and stores canonical originals that are never overwritten. Use when an article or post needs real screenshots of a web product.
+description: Optional StoryOps utility. Captures consistent, privacy-safe screenshots of a running web product with Playwright from a plan the author wrote (each shot has a purpose), masks private data, blocks captures whose DOM text or form values look like secrets (pixels are not scanned, so every image needs visual review) and stores originals that are never overwritten. Use when the author needs real product screenshots for an article they are writing. It does not plan or write the article.
 license: MIT
-compatibility: Needs the editorial-kit CLI, Node.js 20.19+, Playwright and a Chromium build (npx playwright install chromium, or EDITORIAL_CHROMIUM_PATH). Web targets are supported; Electron capture is experimental and untested.
+compatibility: Needs the storyops CLI, Node.js 20.19+, Playwright and a Chromium build (npx playwright install chromium, or STORYOPS_CHROMIUM_PATH). Web targets are supported; Electron capture is experimental and untested.
 metadata:
-  version: "0.1.0"
+  version: "0.3.0"
   repository: "https://github.com/zinverno/storyops"
 ---
 
 # product-screenshots
 
-Screenshots are evidence and explanation, not decoration. Every screenshot has
-a purpose and supports a specific section.
+Screenshots are evidence and explanation for an article the **author** writes.
+This utility captures them; it never plans the article, writes captions as
+article text, or decides where images go in the text.
 
 ## Workflow
 
-1. Plan from the story: `editorial-kit screenshots plan -s articles/<slug>/story.json --base-url http://localhost:3000`
-   → `screenshot-plan.json` + `screenshot-plan.md`. See [references/screenshot-planning.md](references/screenshot-planning.md).
-2. Complete the plan: real `path`s, ready-state selectors (`waitFor`), actions, `mask`/`hide`,
-   optional `launch` command with `readyUrl`. Use realistic demo data.
-3. Capture: `editorial-kit screenshots capture --plan articles/<slug>/screenshot-plan.json`
-   → `articles/<slug>/images/originals/` + `images/manifest.json`.
-4. **Visually review every image** (open it and look) against [references/screenshot-quality.md](references/screenshot-quality.md)
+1. The author (or you, with the author) writes a plan: see
+   `examples/screenshot-plan.example.json` and [references/screenshot-planning.md](references/screenshot-planning.md).
+   Every step has a `purpose`, a real `path`, a ready-state selector (`waitFor`), optional actions,
+   `mask`/`hide`, and an optional `launch` command with `readyUrl`. Use realistic demo data.
+2. Capture: `storyops screenshots capture --plan screenshot-plan.json [--out images]`
+   → `images/originals/` + `images/manifest.json`.
+3. **Visually review every image** (open it and look) against [references/screenshot-quality.md](references/screenshot-quality.md)
    and [references/privacy.md](references/privacy.md). The automatic scan does not see pixels. Only then set
    `"visualReview": "passed"` for that image in `images/manifest.json`.
-5. Reference useful images in the story as `screenshot:<file>` evidence.
-6. When an editorial plan exists, record in `editorial/direction.json → visuals` which section and which story
-   claim each image supports, and add the visual id to the voice-plan beat that uses it (`visualIds`).
 
 ## Decision rules
 
@@ -45,7 +43,7 @@ a purpose and supports a specific section.
 
 ## Failure behavior
 
-- Browser missing → `editorial-kit doctor --browser`; install Chromium or set `EDITORIAL_CHROMIUM_PATH`.
+- Browser missing → `storyops doctor --browser`; install Chromium or set `STORYOPS_CHROMIUM_PATH`.
 - App does not start / ready URL times out → report it; do not fabricate or mock screenshots.
 - Privacy check fails → mask/hide the region or switch to demo data, then recapture.
 - Electron: experimental code path, not tested in this repository. Say so if used.
