@@ -12,6 +12,7 @@ const POSTMORTEM = /постмортем|postmortem|post-mortem|инцидент
 const BEFORE_AFTER = /до и после|было и стало|переход(?:им|ил|или|ят)? (?:с|на) |мигр|migrat|переписал|переписыва|rewrote|rewrite|→|->|\bс \S+ на \S+/i;
 const HOW_TO = /^(?:как|how)\b|how to|how we|как мы|руководство|гайд|\bguide\b|tutorial|пошагов/i;
 const FIRST_PERSON = new Set(['я', 'мы', 'мой', 'моя', 'моё', 'мое', 'мои', 'наш', 'наша', 'наше', 'наши', 'нам', 'меня', 'нас', 'i', 'we', 'my', 'our', 'us']);
+const ARCHITECTURE = /архитектур|как устроен|устройство|под капотом|architecture|internals|how .{1,40} works|design of/i;
 const AI_TOKENS = /^(?:ии|ai|llm|llms|gpt|chatgpt|gpt-\d.*|нейросет\p{L}*|нейронк\p{L}*|нейронн\p{L}*|claude|copilot|gemini|агент\p{L}*|genai|ml)$/u;
 
 export function titleFeatures(title: string): TitleFeatures {
@@ -29,6 +30,7 @@ export function titleFeatures(title: string): TitleFeatures {
     howToFraming: HOW_TO.test(title.trim()),
     hasSubtitleSeparator: /[:—–]|\s-\s|\.\s\S/.test(title),
     aiTopic: tokens.some((t) => AI_TOKENS.test(t)) || /искусственн\p{L}* интеллект|artificial intelligence/iu.test(title),
+    architectureFraming: ARCHITECTURE.test(title),
   };
 }
 
@@ -38,6 +40,7 @@ const DIAGRAM = /diagram|схем|архитектур|architecture|flow|mermaid
 const SUMMARY_HEADING = /итог|вывод|заключ|conclusion|summary|резюме|takeaway/i;
 const NEXT_HEADING = /дальше|план|next|roadmap|будущ|future/i;
 const POSTMORTEM_HEADING = /хронолог|timeline|причин|root cause|что пошло не так|lessons|урок|инцидент|impact|последстви/i;
+const TUTORIAL_HEADING = /^(?:шаг|step)\s*\d|установка|installation|настройка|getting started|пошагов/i;
 const BEFORE_HEADING = /^(?:до\b|было|старая|старый|прежн|before|old\b|legacy)|как было/i;
 const AFTER_HEADING = /^(?:после|стало|новая|новый|after|new\b)|как стало/i;
 
@@ -54,6 +57,9 @@ export function structuralFeatures(blocks: readonly ContentBlock[]): StructuralF
   let wordsBeforeConflict: number | undefined;
   const headings: string[] = [];
   let lastParagraph = '';
+  let paragraphs = 0;
+  let listBlocks = 0;
+  let quoteBlocks = 0;
 
   for (const block of blocks) {
     const w = blockWords(block);
@@ -79,7 +85,12 @@ export function structuralFeatures(blocks: readonly ContentBlock[]): StructuralF
       }
       if (/`[^`]+`/.test(text)) wordsBeforeTechnical ??= words;
       if (wordsBeforeConflict === undefined && CONFLICT_SENTENCE.test(text)) wordsBeforeConflict = words;
-      if (block.type === 'paragraph') lastParagraph = block.text;
+      if (block.type === 'paragraph') {
+        lastParagraph = block.text;
+        paragraphs += 1;
+      }
+      if (block.type === 'list') listBlocks += 1;
+      if (block.type === 'quote') quoteBlocks += 1;
     }
     if (!seenHeading) introWords += w;
     words += w;
@@ -107,6 +118,11 @@ export function structuralFeatures(blocks: readonly ContentBlock[]): StructuralF
     conclusionKind,
     postmortemStructure: headings.some((h) => POSTMORTEM_HEADING.test(h)),
     beforeAfterStructure: headings.some((h) => BEFORE_HEADING.test(h.trim())) && headings.some((h) => AFTER_HEADING.test(h.trim())),
+    paragraphs,
+    listBlocks,
+    quoteBlocks,
+    tutorialStructure: headings.some((h) => TUTORIAL_HEADING.test(h)),
+    architectureStructure: headings.filter((h) => ARCHITECTURE.test(h)).length >= 1,
   };
 }
 

@@ -1,0 +1,749 @@
+{
+  "schemaVersion": 1,
+  "platform": "habr",
+  "collectedAt": "2026-09-10T12:00:00Z",
+  "label": "fixture weekly sample 2026-09-10",
+  "window": "weekly",
+  "articles": [
+    {
+      "id": "habr:800100",
+      "url": "https://habr.com/ru/articles/800100/",
+      "title": "Пишем Telegram-бота с GPT за выходные",
+      "author": "author_03",
+      "publishedAt": "2026-09-03T08:00:00.000Z",
+      "hubs": [
+        "artificial_intelligence"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 15229,
+        "viewsApproximate": true,
+        "rating": 24,
+        "bookmarks": 55,
+        "comments": 18
+      },
+      "structure": {
+        "wordCount": 2340,
+        "introWords": 120,
+        "sectionCount": 4,
+        "codeBlocks": 0,
+        "codeDensity": 0.0,
+        "images": 1,
+        "imagesPer1000Words": 0.43,
+        "diagramHints": 0,
+        "hasMeasurements": true,
+        "wordsBeforeFirstTechnicalDetail": 220,
+        "wordsBeforeConflict": 90,
+        "conclusionKind": "summary",
+        "postmortemStructure": false,
+        "beforeAfterStructure": true,
+        "paragraphs": 20,
+        "listBlocks": 0,
+        "quoteBlocks": 0
+      }
+    },
+    {
+      "id": "habr:800101",
+      "url": "https://habr.com/ru/articles/800101/",
+      "title": "Как ИИ меняет работу тестировщика",
+      "author": "author_08",
+      "publishedAt": "2026-09-04T09:00:00.000Z",
+      "hubs": [
+        "artificial_intelligence"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 23148,
+        "viewsApproximate": true,
+        "rating": 36,
+        "bookmarks": 82,
+        "comments": 27
+      },
+      "structure": {
+        "wordCount": 2477,
+        "introWords": 151,
+        "sectionCount": 5,
+        "codeBlocks": 3,
+        "codeDensity": 0.09,
+        "images": 2,
+        "imagesPer1000Words": 0.81,
+        "diagramHints": 1,
+        "hasMeasurements": true,
+        "wordsBeforeFirstTechnicalDetail": 237,
+        "wordsBeforeConflict": 97,
+        "conclusionKind": "next-steps",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 21,
+        "listBlocks": 1,
+        "quoteBlocks": 1
+      }
+    },
+    {
+      "id": "habr:800102",
+      "url": "https://habr.com/ru/articles/800102/",
+      "title": "Промпты для программиста: подборка приёмов",
+      "author": "author_13",
+      "publishedAt": "2026-09-05T10:00:00.000Z",
+      "hubs": [
+        "artificial_intelligence"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 8067,
+        "viewsApproximate": true,
+        "rating": 14,
+        "bookmarks": 31,
+        "comments": 10
+      },
+      "structure": {
+        "wordCount": 2614,
+        "introWords": 182,
+        "sectionCount": 6,
+        "codeBlocks": 0,
+        "codeDensity": 0.0,
+        "images": 3,
+        "imagesPer1000Words": 1.15,
+        "diagramHints": 0,
+        "hasMeasurements": false,
+        "wordsBeforeFirstTechnicalDetail": 254,
+        "wordsBeforeConflict": 506,
+        "conclusionKind": "questions",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 22,
+        "listBlocks": 2,
+        "quoteBlocks": 0
+      }
+    },
+    {
+      "id": "habr:800103",
+      "url": "https://habr.com/ru/articles/800103/",
+      "title": "ИИ-ассистент в IDE: полгода спустя",
+      "author": "author_18",
+      "publishedAt": "2026-09-06T11:00:00.000Z",
+      "hubs": [
+        "artificial_intelligence"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 15986,
+        "viewsApproximate": true,
+        "rating": 25,
+        "bookmarks": 58,
+        "comments": 19
+      },
+      "structure": {
+        "wordCount": 2751,
+        "introWords": 73,
+        "sectionCount": 7,
+        "codeBlocks": 3,
+        "codeDensity": 0.09,
+        "images": 4,
+        "imagesPer1000Words": 1.45,
+        "diagramHints": 1,
+        "hasMeasurements": true,
+        "wordsBeforeFirstTechnicalDetail": 271,
+        "wordsBeforeConflict": 111,
+        "conclusionKind": "none",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 23,
+        "listBlocks": 3,
+        "quoteBlocks": 1
+      }
+    },
+    {
+      "id": "habr:800104",
+      "url": "https://habr.com/ru/articles/800104/",
+      "title": "LLM в продакшене: чек-лист перед запуском",
+      "author": "author_23",
+      "publishedAt": "2026-09-07T12:00:00.000Z",
+      "hubs": [
+        "artificial_intelligence"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 23905,
+        "viewsApproximate": true,
+        "rating": 37,
+        "bookmarks": 84,
+        "comments": 28
+      },
+      "structure": {
+        "wordCount": 2888,
+        "introWords": 104,
+        "sectionCount": 8,
+        "codeBlocks": 0,
+        "codeDensity": 0.0,
+        "images": 1,
+        "imagesPer1000Words": 0.35,
+        "diagramHints": 0,
+        "hasMeasurements": true,
+        "wordsBeforeFirstTechnicalDetail": 88,
+        "wordsBeforeConflict": 118,
+        "conclusionKind": "summary",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 24,
+        "listBlocks": 0,
+        "quoteBlocks": 0
+      }
+    },
+    {
+      "id": "habr:800105",
+      "url": "https://habr.com/ru/articles/800105/",
+      "title": "Зачем мне нейросеть в pet-проекте",
+      "author": "author_28",
+      "publishedAt": "2026-09-08T13:00:00.000Z",
+      "hubs": [
+        "artificial_intelligence"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 8824,
+        "viewsApproximate": true,
+        "rating": 15,
+        "bookmarks": 34,
+        "comments": 11
+      },
+      "structure": {
+        "wordCount": 3025,
+        "introWords": 135,
+        "sectionCount": 4,
+        "codeBlocks": 3,
+        "codeDensity": 0.09,
+        "images": 2,
+        "imagesPer1000Words": 0.66,
+        "diagramHints": 1,
+        "hasMeasurements": false,
+        "wordsBeforeFirstTechnicalDetail": 105,
+        "wordsBeforeConflict": 245,
+        "conclusionKind": "next-steps",
+        "postmortemStructure": false,
+        "beforeAfterStructure": true,
+        "paragraphs": 25,
+        "listBlocks": 1,
+        "quoteBlocks": 1
+      }
+    },
+    {
+      "id": "habr:800106",
+      "url": "https://habr.com/ru/articles/800106/",
+      "title": "Индексы в ClickHouse: где мы ошиблись",
+      "author": "author_33",
+      "publishedAt": "2026-09-09T14:00:00.000Z",
+      "hubs": [
+        "postgresql"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 16743,
+        "viewsApproximate": true,
+        "rating": 26,
+        "bookmarks": 60,
+        "comments": 20
+      },
+      "structure": {
+        "wordCount": 3162,
+        "introWords": 166,
+        "sectionCount": 5,
+        "codeBlocks": 0,
+        "codeDensity": 0.0,
+        "images": 3,
+        "imagesPer1000Words": 0.95,
+        "diagramHints": 0,
+        "hasMeasurements": true,
+        "wordsBeforeFirstTechnicalDetail": 122,
+        "wordsBeforeConflict": 42,
+        "conclusionKind": "questions",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 26,
+        "listBlocks": 2,
+        "quoteBlocks": 0
+      }
+    },
+    {
+      "id": "habr:800107",
+      "url": "https://habr.com/ru/articles/800107/",
+      "title": "Redis как очередь: подводные камни",
+      "author": "author_01",
+      "publishedAt": "2026-09-03T15:00:00.000Z",
+      "hubs": [
+        "postgresql"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 24662,
+        "viewsApproximate": true,
+        "rating": 38,
+        "bookmarks": 87,
+        "comments": 29
+      },
+      "structure": {
+        "wordCount": 1499,
+        "introWords": 197,
+        "sectionCount": 6,
+        "codeBlocks": 3,
+        "codeDensity": 0.09,
+        "images": 4,
+        "imagesPer1000Words": 2.67,
+        "diagramHints": 1,
+        "hasMeasurements": true,
+        "wordsBeforeFirstTechnicalDetail": 139,
+        "wordsBeforeConflict": 49,
+        "conclusionKind": "none",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 18,
+        "listBlocks": 3,
+        "quoteBlocks": 1
+      }
+    },
+    {
+      "id": "habr:800108",
+      "url": "https://habr.com/ru/articles/800108/",
+      "title": "Храним события в SQLite: WAL и конкурентный доступ",
+      "author": "author_06",
+      "publishedAt": "2026-09-04T16:00:00.000Z",
+      "hubs": [
+        "postgresql"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 9581,
+        "viewsApproximate": true,
+        "rating": 16,
+        "bookmarks": 36,
+        "comments": 12
+      },
+      "structure": {
+        "wordCount": 1636,
+        "introWords": 88,
+        "sectionCount": 7,
+        "codeBlocks": 0,
+        "codeDensity": 0.0,
+        "images": 1,
+        "imagesPer1000Words": 0.61,
+        "diagramHints": 0,
+        "hasMeasurements": false,
+        "wordsBeforeFirstTechnicalDetail": 156,
+        "wordsBeforeConflict": 284,
+        "conclusionKind": "summary",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 19,
+        "listBlocks": 0,
+        "quoteBlocks": 0
+      }
+    },
+    {
+      "id": "habr:800109",
+      "url": "https://habr.com/ru/articles/800109/",
+      "title": "Obsidian как база знаний команды",
+      "author": "author_11",
+      "publishedAt": "2026-09-05T17:00:00.000Z",
+      "hubs": [
+        "personal_productivity"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 17500,
+        "viewsApproximate": true,
+        "rating": 28,
+        "bookmarks": 63,
+        "comments": 21
+      },
+      "structure": {
+        "wordCount": 1773,
+        "introWords": 119,
+        "sectionCount": 8,
+        "codeBlocks": 3,
+        "codeDensity": 0.09,
+        "images": 2,
+        "imagesPer1000Words": 1.13,
+        "diagramHints": 1,
+        "hasMeasurements": true,
+        "wordsBeforeFirstTechnicalDetail": 173,
+        "wordsBeforeConflict": 63,
+        "conclusionKind": "next-steps",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 20,
+        "listBlocks": 1,
+        "quoteBlocks": 1
+      }
+    },
+    {
+      "id": "habr:800110",
+      "url": "https://habr.com/ru/articles/800110/",
+      "title": "Как мы тестируем миграции данных",
+      "author": "author_16",
+      "publishedAt": "2026-09-06T08:00:00.000Z",
+      "hubs": [
+        "programming"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 25419,
+        "viewsApproximate": true,
+        "rating": 39,
+        "bookmarks": 89,
+        "comments": 30
+      },
+      "structure": {
+        "wordCount": 1910,
+        "introWords": 150,
+        "sectionCount": 4,
+        "codeBlocks": 0,
+        "codeDensity": 0.0,
+        "images": 3,
+        "imagesPer1000Words": 1.57,
+        "diagramHints": 0,
+        "hasMeasurements": true,
+        "wordsBeforeFirstTechnicalDetail": 190,
+        "wordsBeforeConflict": 70,
+        "conclusionKind": "questions",
+        "postmortemStructure": false,
+        "beforeAfterStructure": true,
+        "paragraphs": 21,
+        "listBlocks": 2,
+        "quoteBlocks": 0
+      }
+    },
+    {
+      "id": "habr:800111",
+      "url": "https://habr.com/ru/articles/800111/",
+      "title": "Обзор новых возможностей Python 3.14",
+      "author": "author_21",
+      "publishedAt": "2026-09-07T09:00:00.000Z",
+      "hubs": [
+        "programming"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 10338,
+        "viewsApproximate": true,
+        "rating": 17,
+        "bookmarks": 39,
+        "comments": 13
+      },
+      "structure": {
+        "wordCount": 2047,
+        "introWords": 181,
+        "sectionCount": 5,
+        "codeBlocks": 3,
+        "codeDensity": 0.09,
+        "images": 4,
+        "imagesPer1000Words": 1.95,
+        "diagramHints": 1,
+        "hasMeasurements": false,
+        "wordsBeforeFirstTechnicalDetail": 207,
+        "wordsBeforeConflict": 323,
+        "conclusionKind": "none",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 22,
+        "listBlocks": 3,
+        "quoteBlocks": 1
+      }
+    },
+    {
+      "id": "habr:800112",
+      "url": "https://habr.com/ru/articles/800112/",
+      "title": "TypeScript: строгие типы в большом проекте",
+      "author": "author_26",
+      "publishedAt": "2026-09-08T10:00:00.000Z",
+      "hubs": [
+        "programming"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 18257,
+        "viewsApproximate": true,
+        "rating": 29,
+        "bookmarks": 65,
+        "comments": 22
+      },
+      "structure": {
+        "wordCount": 2184,
+        "introWords": 72,
+        "sectionCount": 6,
+        "codeBlocks": 0,
+        "codeDensity": 0.0,
+        "images": 1,
+        "imagesPer1000Words": 0.46,
+        "diagramHints": 0,
+        "hasMeasurements": true,
+        "wordsBeforeFirstTechnicalDetail": 224,
+        "wordsBeforeConflict": 84,
+        "conclusionKind": "summary",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 23,
+        "listBlocks": 0,
+        "quoteBlocks": 0
+      }
+    },
+    {
+      "id": "habr:800113",
+      "url": "https://habr.com/ru/articles/800113/",
+      "title": "Трассировка запросов в распределённой системе",
+      "author": "author_31",
+      "publishedAt": "2026-09-09T11:00:00.000Z",
+      "hubs": [
+        "programming"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 3176,
+        "viewsApproximate": true,
+        "rating": 7,
+        "bookmarks": 15,
+        "comments": 5
+      },
+      "structure": {
+        "wordCount": 2321,
+        "introWords": 103,
+        "sectionCount": 7,
+        "codeBlocks": 3,
+        "codeDensity": 0.09,
+        "images": 2,
+        "imagesPer1000Words": 0.86,
+        "diagramHints": 1,
+        "hasMeasurements": true,
+        "wordsBeforeFirstTechnicalDetail": 241,
+        "wordsBeforeConflict": 349,
+        "conclusionKind": "next-steps",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 24,
+        "listBlocks": 1,
+        "quoteBlocks": 1
+      }
+    },
+    {
+      "id": "habr:800114",
+      "url": "https://habr.com/ru/articles/800114/",
+      "title": "Инцидент с кэшем: хронология и выводы",
+      "author": "author_36",
+      "publishedAt": "2026-09-03T12:00:00.000Z",
+      "hubs": [
+        "programming"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 11095,
+        "viewsApproximate": true,
+        "rating": 18,
+        "bookmarks": 41,
+        "comments": 14
+      },
+      "structure": {
+        "wordCount": 2458,
+        "introWords": 134,
+        "sectionCount": 8,
+        "codeBlocks": 0,
+        "codeDensity": 0.0,
+        "images": 3,
+        "imagesPer1000Words": 1.22,
+        "diagramHints": 0,
+        "hasMeasurements": false,
+        "wordsBeforeFirstTechnicalDetail": 258,
+        "wordsBeforeConflict": 362,
+        "conclusionKind": "questions",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 25,
+        "listBlocks": 2,
+        "quoteBlocks": 0
+      }
+    },
+    {
+      "id": "habr:800115",
+      "url": "https://habr.com/ru/articles/800115/",
+      "title": "Как мы перестали терять события в очереди",
+      "author": "author_04",
+      "publishedAt": "2026-09-04T13:00:00.000Z",
+      "hubs": [
+        "programming"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 19014,
+        "viewsApproximate": true,
+        "rating": 30,
+        "bookmarks": 68,
+        "comments": 23
+      },
+      "structure": {
+        "wordCount": 2595,
+        "introWords": 165,
+        "sectionCount": 4,
+        "codeBlocks": 3,
+        "codeDensity": 0.09,
+        "images": 4,
+        "imagesPer1000Words": 1.54,
+        "diagramHints": 1,
+        "hasMeasurements": true,
+        "wordsBeforeFirstTechnicalDetail": 275,
+        "wordsBeforeConflict": 105,
+        "conclusionKind": "none",
+        "postmortemStructure": false,
+        "beforeAfterStructure": true,
+        "paragraphs": 26,
+        "listBlocks": 3,
+        "quoteBlocks": 1
+      }
+    },
+    {
+      "id": "habr:800116",
+      "url": "https://habr.com/ru/articles/800116/",
+      "title": "Code review в команде из трёх человек",
+      "author": "author_09",
+      "publishedAt": "2026-09-05T14:00:00.000Z",
+      "hubs": [
+        "programming"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 3933,
+        "viewsApproximate": true,
+        "rating": 8,
+        "bookmarks": 18,
+        "comments": 6
+      },
+      "structure": {
+        "wordCount": 2732,
+        "introWords": 196,
+        "sectionCount": 5,
+        "codeBlocks": 0,
+        "codeDensity": 0.0,
+        "images": 1,
+        "imagesPer1000Words": 0.37,
+        "diagramHints": 0,
+        "hasMeasurements": true,
+        "wordsBeforeFirstTechnicalDetail": 92,
+        "wordsBeforeConflict": 388,
+        "conclusionKind": "summary",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 18,
+        "listBlocks": 0,
+        "quoteBlocks": 0
+      }
+    },
+    {
+      "id": "habr:800117",
+      "url": "https://habr.com/ru/articles/800117/",
+      "title": "Монорепозиторий: полтора года спустя",
+      "author": "author_14",
+      "publishedAt": "2026-09-06T15:00:00.000Z",
+      "hubs": [
+        "programming"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 11852,
+        "viewsApproximate": true,
+        "rating": 19,
+        "bookmarks": 44,
+        "comments": 15
+      },
+      "structure": {
+        "wordCount": 2869,
+        "introWords": 87,
+        "sectionCount": 6,
+        "codeBlocks": 3,
+        "codeDensity": 0.09,
+        "images": 2,
+        "imagesPer1000Words": 0.7,
+        "diagramHints": 1,
+        "hasMeasurements": false,
+        "wordsBeforeFirstTechnicalDetail": 109,
+        "wordsBeforeConflict": 401,
+        "conclusionKind": "next-steps",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 19,
+        "listBlocks": 1,
+        "quoteBlocks": 1
+      }
+    },
+    {
+      "id": "habr:800118",
+      "url": "https://habr.com/ru/articles/800118/",
+      "title": "Обработка ошибок в Rust на практике",
+      "author": "author_19",
+      "publishedAt": "2026-09-07T16:00:00.000Z",
+      "hubs": [
+        "programming"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 19771,
+        "viewsApproximate": true,
+        "rating": 31,
+        "bookmarks": 70,
+        "comments": 23
+      },
+      "structure": {
+        "wordCount": 3006,
+        "introWords": 118,
+        "sectionCount": 7,
+        "codeBlocks": 0,
+        "codeDensity": 0.0,
+        "images": 3,
+        "imagesPer1000Words": 1.0,
+        "diagramHints": 0,
+        "hasMeasurements": true,
+        "wordsBeforeFirstTechnicalDetail": 126,
+        "wordsBeforeConflict": 126,
+        "conclusionKind": "questions",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 20,
+        "listBlocks": 2,
+        "quoteBlocks": 0
+      }
+    },
+    {
+      "id": "habr:800119",
+      "url": "https://habr.com/ru/articles/800119/",
+      "title": "Как мы внедряли feature flags",
+      "author": "author_24",
+      "publishedAt": "2026-09-08T17:00:00.000Z",
+      "hubs": [
+        "programming"
+      ],
+      "tags": [],
+      "metrics": {
+        "views": 4690,
+        "viewsApproximate": true,
+        "rating": 9,
+        "bookmarks": 20,
+        "comments": 7
+      },
+      "structure": {
+        "wordCount": 3143,
+        "introWords": 149,
+        "sectionCount": 8,
+        "codeBlocks": 3,
+        "codeDensity": 0.09,
+        "images": 4,
+        "imagesPer1000Words": 1.27,
+        "diagramHints": 1,
+        "hasMeasurements": true,
+        "wordsBeforeFirstTechnicalDetail": 143,
+        "wordsBeforeConflict": 427,
+        "conclusionKind": "none",
+        "postmortemStructure": false,
+        "beforeAfterStructure": false,
+        "paragraphs": 21,
+        "listBlocks": 3,
+        "quoteBlocks": 1
+      }
+    }
+  ]
+}

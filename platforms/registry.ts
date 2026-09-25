@@ -1,4 +1,4 @@
-import { EditorialError } from '../src/shared/errors.js';
+import { StoryOpsError } from '../src/shared/errors.js';
 import { parseWithSchema } from '../src/shared/fs.js';
 import { platformStrategySchema, type PlatformModule } from './schema.js';
 import { habrPlatform } from './habr/index.js';
@@ -13,7 +13,7 @@ export class PlatformRegistry {
   /** Validates the strategy against the shared schema before accepting it. */
   register(module: PlatformModule): this {
     const strategy = parseWithSchema(platformStrategySchema, module.strategy, `platform strategy "${module.strategy?.id ?? '?'}"`);
-    if (this.modules.has(strategy.id)) throw new EditorialError('PLATFORM_DUPLICATE', `Platform "${strategy.id}" is already registered`);
+    if (this.modules.has(strategy.id)) throw new StoryOpsError('PLATFORM_DUPLICATE', `Platform "${strategy.id}" is already registered`);
     this.modules.set(strategy.id, { ...module, strategy });
     return this;
   }
@@ -25,7 +25,7 @@ export class PlatformRegistry {
   get(id: string): PlatformModule {
     const module = this.modules.get(id);
     if (!module) {
-      throw new EditorialError('PLATFORM_UNKNOWN', `Unknown platform "${id}"`, { hint: `Registered platforms: ${this.ids().join(', ')}` });
+      throw new StoryOpsError('PLATFORM_UNKNOWN', `Unknown platform "${id}"`, { hint: `Registered platforms: ${this.ids().join(', ')}` });
     }
     return module;
   }

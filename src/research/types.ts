@@ -13,6 +13,7 @@ export const titleFeaturesSchema = z.object({
   howToFraming: z.boolean(),
   hasSubtitleSeparator: z.boolean(),
   aiTopic: z.boolean(),
+  architectureFraming: z.boolean().optional(),
 });
 export type TitleFeatures = z.infer<typeof titleFeaturesSchema>;
 
@@ -34,6 +35,12 @@ export const structuralFeaturesSchema = z.object({
   conclusionKind: z.enum(['summary', 'next-steps', 'questions', 'none']),
   postmortemStructure: z.boolean(),
   beforeAfterStructure: z.boolean(),
+  /** Block counts for density features (optional: older snapshots lack them). */
+  paragraphs: z.number().int().optional(),
+  listBlocks: z.number().int().optional(),
+  quoteBlocks: z.number().int().optional(),
+  tutorialStructure: z.boolean().optional(),
+  architectureStructure: z.boolean().optional(),
 });
 export type StructuralFeatures = z.infer<typeof structuralFeaturesSchema>;
 

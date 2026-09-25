@@ -1,11 +1,11 @@
 import type { Clock } from '../shared/clock.js';
-import { EditorialError, errorMessage } from '../shared/errors.js';
+import { StoryOpsError, errorMessage } from '../shared/errors.js';
 import type { Logger } from '../shared/logger.js';
 import { sanitizeUrl } from '../shared/redact.js';
-import type { HttpCache } from './cache.js';
+import type { CacheEntry, HttpCache } from './cache.js';
 import { isAllowed, parseRobots, type RobotsRules } from './robots.js';
 
-export const USER_AGENT_TOKEN = 'editorial-kit';
+export const USER_AGENT_TOKEN = 'storyops';
 
 export interface FetchedPage {
   url: string;
@@ -21,6 +21,8 @@ export interface FetchedPage {
   liveError?: string;
   /** Final URL when the live request was redirected (the cache key stays `url`). */
   finalUrl?: string;
+  /** True when the server answered 304 Not Modified to a conditional request and the cached body was reused. */
+  revalidated?: boolean;
 }
 
 export interface HttpClientOptions {
@@ -68,8 +70,8 @@ export class HttpClient {
   constructor(private readonly options: HttpClientOptions) {
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
-    const contact = options.userAgentContact ?? process.env.EDITORIAL_USER_AGENT_CONTACT;
-    this.userAgent = `${USER_AGENT_TOKEN}/0.1 (+https://github.com/zinverno/storyops${contact ? `; ${contact}` : ''})`;
+    const contact = options.userAgentContact ?? process.env.STORYOPS_USER_AGENT_CONTACT ?? process.env.EDITORIAL_USER_AGENT_CONTACT;
+    this.userAgent = `${USER_AGENT_TOKEN}/0.3 (+https://github.com/zinverno/storyops${contact ? `; ${contact}` : ''})`;
   }
 
   async get(platform: string, url: string): Promise<FetchedPage> {
@@ -88,10 +90,10 @@ export class HttpClient {
       };
     }
     if (this.options.offline) {
-      throw new EditorialError('OFFLINE_CACHE_MISS', `Offline mode: no cached copy of ${sanitizeUrl(url)}`);
+      throw new StoryOpsError('OFFLINE_CACHE_MISS', `Offline mode: no cached copy of ${sanitizeUrl(url)}`);
     }
     try {
-      return await this.withSlot(() => this.fetchLive(platform, url));
+      return await this.withSlot(() => this.fetchLive(platform, url, cached?.entry));
     } catch (error) {
       if (cached) {
         const reason = errorMessage(error);
@@ -153,7 +155,7 @@ export class HttpClient {
       await this.options.cache.set({ platform, url: robotsUrl, fetchedAt: this.options.clock.now().toISOString(), status, body, ...(response.finalUrl !== robotsUrl ? { finalUrl: response.finalUrl } : {}) });
     }
     if (status !== undefined && status >= 500) {
-      throw new EditorialError('ROBOTS_UNAVAILABLE', `robots.txt for ${origin.host} returned ${status}; refusing to crawl.`);
+      throw new StoryOpsError('ROBOTS_UNAVAILABLE', `robots.txt for ${origin.host} returned ${status}; refusing to crawl.`);
     }
     if (status !== undefined && status >= 200 && status < 300 && body) rules = parseRobots(body, USER_AGENT_TOKEN);
     this.robots.set(key, rules);
@@ -165,9 +167,9 @@ export class HttpClient {
    * handled by the caller so it passes robots.txt and per-host scheduling.
    * No cookies, credentials or Authorization headers are ever sent.
    */
-  private async request(url: string): Promise<Response> {
+  private async request(url: string, conditional: Record<string, string> = {}): Promise<Response> {
     return this.fetchImpl(url, {
-      headers: { 'user-agent': this.userAgent, accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.5', 'accept-language': 'ru,en;q=0.8' },
+      headers: { 'user-agent': this.userAgent, accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.5', 'accept-language': 'ru,en;q=0.8', ...conditional },
       redirect: 'manual',
       credentials: 'omit',
       signal: AbortSignal.timeout(this.options.timeoutMs),
@@ -177,18 +179,18 @@ export class HttpClient {
   /** Resolves a redirect Location against the current URL and validates it. */
   private redirectTarget(response: Response, current: string, chain: readonly string[]): string {
     const location = response.headers.get('location');
-    if (!location) throw new EditorialError('REDIRECT_INVALID', `${sanitizeUrl(current)} returned ${response.status} without a Location header`);
+    if (!location) throw new StoryOpsError('REDIRECT_INVALID', `${sanitizeUrl(current)} returned ${response.status} without a Location header`);
     let next: URL;
     try {
       next = new URL(location, current);
     } catch {
-      throw new EditorialError('REDIRECT_INVALID', `${sanitizeUrl(current)} redirected to an invalid URL`);
+      throw new StoryOpsError('REDIRECT_INVALID', `${sanitizeUrl(current)} redirected to an invalid URL`);
     }
     next.hash = '';
-    if (next.protocol !== 'https:' && next.protocol !== 'http:') throw new EditorialError('REDIRECT_INVALID', `${sanitizeUrl(current)} redirected to unsupported scheme ${next.protocol}`);
+    if (next.protocol !== 'https:' && next.protocol !== 'http:') throw new StoryOpsError('REDIRECT_INVALID', `${sanitizeUrl(current)} redirected to unsupported scheme ${next.protocol}`);
     const target = next.toString();
-    if (chain.includes(target)) throw new EditorialError('REDIRECT_LOOP', `Redirect loop: ${[...chain, target].map(sanitizeUrl).join(' → ')}`);
-    if (chain.length > MAX_REDIRECTS) throw new EditorialError('TOO_MANY_REDIRECTS', `More than ${MAX_REDIRECTS} redirects starting at ${sanitizeUrl(chain[0]!)}`);
+    if (chain.includes(target)) throw new StoryOpsError('REDIRECT_LOOP', `Redirect loop: ${[...chain, target].map(sanitizeUrl).join(' → ')}`);
+    if (chain.length > MAX_REDIRECTS) throw new StoryOpsError('TOO_MANY_REDIRECTS', `More than ${MAX_REDIRECTS} redirects starting at ${sanitizeUrl(chain[0]!)}`);
     return target;
   }
 
@@ -225,18 +227,28 @@ export class HttpClient {
    * repeated requests hit the cache); the final URL after redirects is
    * recorded in the entry as `finalUrl` for inspection.
    */
-  private async fetchLive(platform: string, url: string): Promise<FetchedPage> {
+  private async fetchLive(platform: string, url: string, cachedEntry?: CacheEntry): Promise<FetchedPage> {
     const chain = [url];
     let current = url;
+    // Conditional request on the first hop when the cached copy carries validators.
+    const conditional: Record<string, string> = {};
+    if (cachedEntry?.etag) conditional['if-none-match'] = cachedEntry.etag;
+    if (cachedEntry?.lastModified) conditional['if-modified-since'] = cachedEntry.lastModified;
     for (;;) {
       const parsed = new URL(current);
-      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new EditorialError('UNSUPPORTED_URL', `Unsupported URL scheme: ${parsed.protocol}`);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new StoryOpsError('UNSUPPORTED_URL', `Unsupported URL scheme: ${parsed.protocol}`);
       const rules = await this.robotsFor(parsed, platform);
       if (!isAllowed(rules, `${parsed.pathname}${parsed.search}`)) {
         const via = chain.length > 1 ? ` (redirected from ${sanitizeUrl(url)})` : '';
-        throw new EditorialError('ROBOTS_DISALLOWED', `robots.txt disallows ${sanitizeUrl(current)}${via} for automated clients; skipping.`);
+        throw new StoryOpsError('ROBOTS_DISALLOWED', `robots.txt disallows ${sanitizeUrl(current)}${via} for automated clients; skipping.`);
       }
-      const { response, body } = await this.requestWithRetries(current, parsed.host, rules);
+      const { response, body } = await this.requestWithRetries(current, parsed.host, rules, current === url ? conditional : {});
+      if (response.status === 304 && cachedEntry) {
+        const fetchedAt = this.options.clock.now().toISOString();
+        await this.options.cache.set({ ...cachedEntry, fetchedAt });
+        this.options.logger.debug(`not modified ${sanitizeUrl(url)}; reusing the cached body`);
+        return { url, status: cachedEntry.status, body: cachedEntry.body, fetchedAt, fromCache: false, revalidated: true, ...(cachedEntry.finalUrl ? { finalUrl: cachedEntry.finalUrl } : {}) };
+      }
       if (REDIRECT_STATUSES.has(response.status)) {
         current = this.redirectTarget(response, current, chain);
         chain.push(current);
@@ -244,12 +256,14 @@ export class HttpClient {
         continue;
       }
       if (response.status === 401 || response.status === 402 || response.status === 403 || (response.status >= 400 && CHALLENGE_MARKERS.some((m) => m.test(body.slice(0, 5000))))) {
-        throw new EditorialError('ACCESS_RESTRICTED', `${sanitizeUrl(current)} returned ${response.status} (access restricted or anti-bot challenge). Not retrying.`);
+        throw new StoryOpsError('ACCESS_RESTRICTED', `${sanitizeUrl(current)} returned ${response.status} (access restricted or anti-bot challenge). Not retrying.`);
       }
-      if (response.status >= 400) throw new EditorialError('HTTP_ERROR', `${sanitizeUrl(current)} returned ${response.status}`);
+      if (response.status >= 400) throw new StoryOpsError('HTTP_ERROR', `${sanitizeUrl(current)} returned ${response.status}`);
       const fetchedAt = this.options.clock.now().toISOString();
       const contentType = response.headers.get('content-type') ?? undefined;
-      await this.options.cache.set({ platform, url, fetchedAt, status: response.status, body, ...(contentType ? { contentType } : {}), ...(current !== url ? { finalUrl: current } : {}) });
+      const etag = response.headers.get('etag') ?? undefined;
+      const lastModified = response.headers.get('last-modified') ?? undefined;
+      await this.options.cache.set({ platform, url, fetchedAt, status: response.status, body, ...(contentType ? { contentType } : {}), ...(current !== url ? { finalUrl: current } : {}), ...(etag ? { etag } : {}), ...(lastModified ? { lastModified } : {}) });
       const page: FetchedPage = { url, status: response.status, body, fetchedAt, fromCache: false };
       if (current !== url) page.finalUrl = current;
       return page;
@@ -257,7 +271,7 @@ export class HttpClient {
   }
 
   /** One hop with retries for network errors, 429 and 5xx. Redirect bodies are discarded. */
-  private async requestWithRetries(url: string, host: string, rules: RobotsRules): Promise<{ response: Response; body: string }> {
+  private async requestWithRetries(url: string, host: string, rules: RobotsRules, conditional: Record<string, string> = {}): Promise<{ response: Response; body: string }> {
     const maxRetries = this.options.maxRetries ?? 2;
     let lastError: unknown;
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
@@ -265,9 +279,9 @@ export class HttpClient {
       this.options.logger.debug(`GET ${sanitizeUrl(url)}${attempt > 0 ? ` (retry ${attempt})` : ''}`);
       let response: Response;
       try {
-        response = await this.request(url);
+        response = await this.request(url, conditional);
       } catch (error) {
-        lastError = new EditorialError('NETWORK_ERROR', `Request to ${sanitizeUrl(url)} failed: ${errorMessage(error)}`, { cause: error });
+        lastError = new StoryOpsError('NETWORK_ERROR', `Request to ${sanitizeUrl(url)} failed: ${errorMessage(error)}`, { cause: error });
         await this.sleep(1000 * 2 ** attempt);
         continue;
       }
@@ -278,12 +292,12 @@ export class HttpClient {
       const body = await response.text();
       if (response.status === 429 || response.status >= 500) {
         const retryAfter = Number(response.headers.get('retry-after'));
-        lastError = new EditorialError('HTTP_RETRYABLE', `${sanitizeUrl(url)} returned ${response.status}`);
+        lastError = new StoryOpsError('HTTP_RETRYABLE', `${sanitizeUrl(url)} returned ${response.status}`);
         await this.sleep(Math.min(60_000, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2000 * 2 ** attempt));
         continue;
       }
       return { response, body };
     }
-    throw lastError instanceof Error ? lastError : new EditorialError('NETWORK_ERROR', `Request to ${sanitizeUrl(url)} failed`);
+    throw lastError instanceof Error ? lastError : new StoryOpsError('NETWORK_ERROR', `Request to ${sanitizeUrl(url)} failed`);
   }
 }

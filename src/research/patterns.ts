@@ -4,7 +4,8 @@ import type { Observation, SaturatedAngle, TrendArticle } from './types.js';
 /**
  * Abstract editorial pattern extraction. Produces OBSERVATIONS about a sample
  * (counts, shares, medians) with provenance. It never produces
- * recommendations; those are made later, in briefs, and are labelled advisory.
+ * recommendations: the pattern report presents them as context and leaves every
+ * decision to the author.
  */
 
 interface BooleanFeature {

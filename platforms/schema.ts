@@ -5,15 +5,19 @@ import type { Clock } from '../src/shared/clock.js';
 import type { Logger } from '../src/shared/logger.js';
 import type { HttpClient } from '../src/research/http.js';
 import type { FailureRecord, SourceRecord, TrendArticle } from '../src/research/types.js';
-import type { CanonicalStory } from '../src/stories/schema.js';
-
-export const PLATFORM_STRATEGY_SCHEMA_VERSION = 1;
 
 /**
- * Every rule in a strategy is explicitly one of:
- * - `constraint`: a hard platform limit or requirement (e.g. a documented
- *   character limit). Violating it breaks publishing.
- * - `recommendation`: stable editorial guidance for the platform.
+ * Platform strategy, version 2 (StoryOps v3). A strategy describes how to
+ * ANALYSE a platform and REVIEW a human-written article's fit for it. It no
+ * longer describes how to generate a publication: v1 fields for draft
+ * skeletons, openings and headline templates were removed.
+ */
+export const PLATFORM_STRATEGY_SCHEMA_VERSION = 2;
+
+/**
+ * Every rule is explicitly one of:
+ * - `constraint`: a hard platform limit (e.g. a documented character limit).
+ * - `recommendation`: stable platform convention, reported as context only.
  * `source` says where the rule comes from so it can be re-verified.
  */
 export const ruleSchema = z.object({
@@ -25,6 +29,7 @@ export type StrategyRule = z.infer<typeof ruleSchema>;
 
 const rules = z.array(ruleSchema);
 
+/** Kinds of technical articles; review profiles and length context are keyed by them. */
 export const publicationTypeSchema = z.enum([
   'engineering-story',
   'architecture-deep-dive',
@@ -49,6 +54,7 @@ export const lengthRangeSchema = z.object({
   kind: z.enum(['constraint', 'recommendation']),
   note: z.string().optional(),
 });
+export type LengthRange = z.infer<typeof lengthRangeSchema>;
 
 export const platformStrategySchema = z.object({
   schemaVersion: z.literal(PLATFORM_STRATEGY_SCHEMA_VERSION),
@@ -56,66 +62,39 @@ export const platformStrategySchema = z.object({
   displayName: z.string().min(1),
   version: z.string().min(1),
   description: z.string().min(1),
-  content: z.object({
-    preferredDepth: z.enum(['brief', 'standard', 'deep']),
-    technicalDetail: z.enum(['low', 'selective', 'moderate', 'high']),
-    expectedLength: z.record(z.string(), lengthRangeSchema),
-    supportedPublicationTypes: z.array(publicationTypeSchema).min(1),
-    defaultPublicationType: publicationTypeSchema,
-    rules,
+  /** How StoryOps can learn about this platform. */
+  research: z.object({
+    liveResearch: z.enum(['implemented', 'unsupported', 'not-applicable']),
+    authorHistory: z.enum(['implemented', 'manual-import', 'not-applicable']),
+    /** Datasets can always be imported (`storyops research import`); live research may still be unsupported. */
+    importSupported: z.boolean(),
+    sources: z.array(z.string()),
+    limitations: z.array(z.string()),
   }),
-  opening: z.object({
-    preferred: z.string(),
-    genericIntroPolicy: z.enum(['forbidden', 'discouraged']),
-    previousPublicationCallback: z.enum(['required-for-series', 'recommended', 'optional', 'avoid']),
-    rules,
-  }),
-  headline: z.object({
-    maxLength: z.object({ chars: z.number().int().positive(), kind: z.enum(['constraint', 'recommendation']), source: z.string().optional() }).optional(),
-    preferredPatterns: z.array(z.string()),
-    avoidPatterns: z.array(z.string()),
-    rules,
-  }),
-  structure: z.object({
-    sections: z.enum(['required', 'recommended', 'optional', 'none']),
-    paragraphDensity: z.enum(['short', 'medium', 'long']),
-    lists: z.string(),
-    code: z.enum(['encouraged', 'when-useful', 'sparingly', 'avoid']),
-    rules,
-  }),
-  media: z.object({
-    screenshots: z.enum(['encouraged', 'when-useful', 'limited', 'optional']),
-    diagrams: z.enum(['encouraged', 'when-useful', 'limited', 'optional']),
-    imageCount: z.object({ min: z.number().int().nonnegative(), max: z.number().int().positive() }),
-    aspect: z.string().optional(),
-    rules,
-  }),
-  links: z.object({ policy: z.string(), rules }),
-  tone: z.object({
-    formality: z.enum(['informal', 'conversational', 'professional', 'neutral']),
+  /**
+   * Context for platform-fit review. Everything here is reported as context
+   * next to the author's own choices; none of it overrides the author.
+   */
+  reviewContext: z.object({
+    /** Typical length per article kind (context, not a target). */
+    typicalLength: z.record(z.string(), lengthRangeSchema),
+    /** Whether sectioned long-form is usual. */
+    sections: z.enum(['usual', 'optional', 'not-rendered']),
+    code: z.enum(['common', 'when-useful', 'rare']),
+    images: z.object({ min: z.number().int().nonnegative(), max: z.number().int().positive() }),
+    /** Generic, context-free introductions (reviewed as a structure finding when discouraged). */
+    genericIntro: z.enum(['discouraged', 'neutral']),
     marketingTolerance: z.enum(['none', 'low', 'moderate']),
-    adjustments: z.array(z.string()),
-    rules,
+    conventions: rules,
   }),
   formatting: z.object({
     format: z.enum(['markdown', 'html', 'plain-text', 'telegram-markdown']),
     constraints: rules,
   }),
-  research: z.object({
-    liveResearch: z.enum(['implemented', 'unsupported', 'not-applicable']),
-    authorHistory: z.enum(['implemented', 'manual-import', 'not-applicable']),
-    sources: z.array(z.string()),
-    limitations: z.array(z.string()),
-  }),
   metadata: z.object({
     required: z.array(z.string()),
     optional: z.array(z.string()),
   }),
-  /**
-   * Section skeletons per publication type. These are patterns the agent may
-   * adapt, not templates it must fill.
-   */
-  structures: z.record(z.string(), z.array(z.object({ id: z.string(), purpose: z.string(), storyFields: z.array(z.string()) }))),
 });
 export type PlatformStrategy = z.infer<typeof platformStrategySchema>;
 
@@ -140,33 +119,30 @@ export interface TrendWindow {
   url: string;
 }
 
+export interface TrendCollectionOptions {
+  periods: string[];
+  hubs: string[];
+  maxArticlesPerPeriod: number;
+  fetchArticleBodies: boolean;
+  /**
+   * Article ids whose abstract features are already stored and unchanged.
+   * Their bodies are not downloaded again (metrics still come from list pages).
+   */
+  knownFeatures?: ReadonlySet<string>;
+}
+
 /** Optional live-research capability of a platform. */
 export interface PlatformResearchAdapter {
   collectAuthorHistory?(profileUrl: string, ctx: ResearchContext, options: { maxArticles: number }): Promise<CollectionResult<Publication>>;
-  collectTrends?(ctx: ResearchContext, options: { periods: string[]; hubs: string[]; maxArticlesPerPeriod: number; fetchArticleBodies: boolean }): Promise<CollectionResult<TrendArticle> & { windows: TrendWindow[] }>;
-}
-
-export interface RenderInput {
-  story: CanonicalStory;
-  strategy: PlatformStrategy;
-  publicationType: PublicationType;
-  storyPath: string;
-  /** Notes about the Phase 2 editorial plan (or its absence), shown in the scaffold guidance. */
-  editorialNotes?: string[];
-}
-
-/** Optional renderer producing the platform-specific draft workspace. */
-export interface PlatformRenderer {
-  render(input: RenderInput): string;
+  collectTrends?(ctx: ResearchContext, options: TrendCollectionOptions): Promise<CollectionResult<TrendArticle> & { windows: TrendWindow[] }>;
 }
 
 /**
- * A platform module = strategy (required) + optional research adapter +
- * optional renderer. Registering one never requires changing author memory,
- * continuity, narrative gap, stories, evidence or screenshots.
+ * A platform module = strategy (required) + optional research adapter.
+ * Registering one never requires changes in the database, topic, author,
+ * repository or review layers.
  */
 export interface PlatformModule {
   strategy: PlatformStrategy;
   research?: PlatformResearchAdapter;
-  renderer?: PlatformRenderer;
 }

@@ -2,12 +2,11 @@
 
 | Capability | Status |
 | --- | --- |
-| Strategy | implemented |
+| Strategy (analysis + review fit) | implemented |
 | Live trend research | **unsupported** (feed content requires authentication; not scraped) |
-| Author history | manual import (`editorial-kit author import <file> -p linkedin`) |
-| Renderer | default scaffold renderer (no headings) |
+| Author history | manual import (`storyops author import <file> -p linkedin`) |
+| Dataset import | yes (`storyops research import`) |
 
-Hard constraints encoded: 3,000-character post limit (verify against LinkedIn
-help), no Markdown rendering. Everything else (first lines before "see more",
-single visual, short paragraphs) is an editorial recommendation. The strategy
-explicitly discourages motivational influencer copy and engagement bait.
+Hard constraints used by platform-fit review: 3,000-character post limit
+(verify against LinkedIn help), no Markdown rendering. Everything else is
+context. StoryOps does not fabricate LinkedIn activity data.
