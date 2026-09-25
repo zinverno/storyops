@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { EditorialConfig } from '../config/schema.js';
+import type { StoryOpsConfig } from '../config/schema.js';
 import type { ContinuityMap } from '../continuity/schema.js';
 import type { PublicationIndex } from '../publications/index-schema.js';
 import type { Publication } from '../publications/schema.js';
@@ -49,7 +49,7 @@ export type AuthorProfile = z.infer<typeof authorProfileSchema>;
 
 const round = (n: number) => Math.round(n * 10) / 10;
 
-export function buildAuthorProfile(config: EditorialConfig, publications: readonly Publication[], index: PublicationIndex, continuity: ContinuityMap, clock: Clock, previous?: AuthorProfile): AuthorProfile {
+export function buildAuthorProfile(config: StoryOpsConfig, publications: readonly Publication[], index: PublicationIndex, continuity: ContinuityMap, clock: Clock, previous?: AuthorProfile): AuthorProfile {
   const byPlatform: Record<string, number> = {};
   const depth: Record<string, number> = {};
   for (const p of publications) byPlatform[p.platform] = (byPlatform[p.platform] ?? 0) + 1;
@@ -103,13 +103,13 @@ export function renderAuthorProfile(p: AuthorProfile): string {
     '',
     `Updated ${p.updatedAt}. Language: ${p.language}. Style profile: \`${p.styleProfile}\`.`,
     '',
-    '> Author identity and voice. Platform presentation conventions live in platform strategies and must not replace this voice.',
+    '> What the archive says about this author. StoryOps uses it for coverage and review context; it never writes in the author\'s voice.',
     '',
-    '## Voice (manual — edit `manual` in author-profile.json)',
+    '## Author notes (manual — edit `manual` in author-profile.json)',
     '',
     mdList([`tone: ${p.manual.tone || '_not set_'}`, `technical depth: ${p.manual.technicalDepth || '_not set_'}`, `preferred terminology: ${p.manual.preferredTerminology.join(', ') || '_not set_'}`, `avoid: ${p.manual.avoid.join(', ') || '_not set_'}`, ...p.manual.voiceNotes]),
     '',
-    '## Style guidance',
+    '## Review language profile',
     '',
     mdList(style.guidance),
     '',

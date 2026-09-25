@@ -1,5 +1,5 @@
 /**
- * Style profiles are data: pattern rules plus density thresholds. The
+ * Language profiles for review: pattern rules plus density thresholds. The
  * checker reports findings; it never rewrites text.
  */
 export interface PatternRule {
@@ -45,16 +45,13 @@ const ru: StyleProfile = {
   ],
   thresholds: { emDashPer1000: 12, notXButYPer1000: 2, exclamationsPer1000: 3, longSentenceWords: 40, longSentenceShare: 0.15 },
   guidance: [
-    'Write like a developer discussing a real project in natural technical Russian; concrete over promotional.',
-    'First person where the author actually made the decision or supplied the experience (author-input.md).',
-    'For a continuing series, start from what changed since the previous publication.',
-    'Explain architecture through actual engineering problems.',
-    'Mention limitations when evidence exists. Never invent experiences, failures, users or adoption.',
-    'No corporate press-release voice, no generic AI marketing, no bureaucratic phrasing, no clichés.',
-    'Avoid repetitive "не X, а Y", artificial triads and heavy em-dash use.',
-    'Moderate natural humour is fine; no fake drama.',
-    'Author voice outranks the article style preset, the platform strategy and current trends.',
+    'Review criteria (StoryOps reviews a human-written text against them; it never writes in this style):',
+    'Concrete over promotional: flags press-release voice, generic AI marketing, bureaucratic phrasing and clichés.',
+    'Claims about results, users or adoption need evidence; the review marks unsupported ones.',
+    'Formulaic rhythm is reported: repeated "не X, а Y", artificial triads, heavy em-dash use.',
+    'Generic introductions are reported as a structure finding.',
   ],
+
 };
 
 const en: StyleProfile = {
@@ -68,7 +65,7 @@ const en: StyleProfile = {
     { id: 'inflated-claim', pattern: /(?:orders of magnitude|dramatically|massively|10x)/i, message: 'Inflated claim; back it with a measurement.', severity: 'warning' },
   ],
   thresholds: { emDashPer1000: 12, notXButYPer1000: 3, exclamationsPer1000: 3, longSentenceWords: 35, longSentenceShare: 0.15 },
-  guidance: ['Concrete over promotional.', 'State limitations.', 'Never invent users, results or experiences.'],
+  guidance: ['Review criteria only: promotional wording, inflated claims and generic openings are reported; StoryOps never writes in this style.'],
 };
 
 export const STYLE_PROFILES: Record<string, StyleProfile> = { [ru.id]: ru, [en.id]: en };

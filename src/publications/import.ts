@@ -2,7 +2,7 @@ import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 import type { Clock } from '../shared/clock.js';
-import { EditorialError } from '../shared/errors.js';
+import { StoryOpsError } from '../shared/errors.js';
 import { parseFrontmatter } from '../shared/frontmatter.js';
 import { parseMarkdownStructure } from '../shared/markdown.js';
 import { slugify, wordCount } from '../shared/text.js';
@@ -40,12 +40,12 @@ export async function importMarkdownPublication(file: string, options: ImportOpt
   const { data, body } = parseFrontmatter(source);
   const fm = frontmatterSchema.safeParse(data);
   if (!fm.success) {
-    throw new EditorialError('IMPORT_FRONTMATTER', `Invalid frontmatter in ${file}: ${fm.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
+    throw new StoryOpsError('IMPORT_FRONTMATTER', `Invalid frontmatter in ${file}: ${fm.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
   }
   const meta = fm.data;
   const platform = options.platform ?? meta.platform;
   if (!platform) {
-    throw new EditorialError('IMPORT_PLATFORM', `Cannot determine platform for ${file}`, { hint: 'Pass --platform or add `platform:` to the frontmatter.' });
+    throw new StoryOpsError('IMPORT_PLATFORM', `Cannot determine platform for ${file}`, { hint: 'Pass --platform or add `platform:` to the frontmatter.' });
   }
   const structure = parseMarkdownStructure(body);
   const title = meta.title ?? structure.title ?? path.basename(file, path.extname(file));
@@ -77,6 +77,6 @@ export async function importMarkdownPublication(file: string, options: ImportOpt
 
 function normalizeDate(value: string): string {
   const parsed = new Date(value.length === 10 ? `${value}T00:00:00Z` : value);
-  if (Number.isNaN(parsed.getTime())) throw new EditorialError('IMPORT_DATE', `Unrecognised date: ${value}`, { hint: 'Use ISO 8601, e.g. 2026-03-14.' });
+  if (Number.isNaN(parsed.getTime())) throw new StoryOpsError('IMPORT_DATE', `Unrecognised date: ${value}`, { hint: 'Use ISO 8601, e.g. 2026-03-14.' });
   return parsed.toISOString();
 }

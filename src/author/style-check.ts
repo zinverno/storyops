@@ -1,6 +1,6 @@
 import { splitSentences, wordCount } from '../shared/text.js';
 import { STYLE_PROFILES, type StyleProfile } from './style-profiles.js';
-import { EditorialError } from '../shared/errors.js';
+import { StoryOpsError } from '../shared/errors.js';
 
 export interface StyleFinding {
   rule: string;
@@ -19,17 +19,20 @@ export interface StyleReport {
 
 export function getStyleProfile(id: string): StyleProfile {
   const profile = STYLE_PROFILES[id];
-  if (!profile) throw new EditorialError('STYLE_PROFILE', `Unknown style profile "${id}"`, { hint: `Available: ${Object.keys(STYLE_PROFILES).join(', ')}` });
+  if (!profile) throw new StoryOpsError('STYLE_PROFILE', `Unknown style profile "${id}"`, { hint: `Available: ${Object.keys(STYLE_PROFILES).join(', ')}` });
   return profile;
 }
 
-/** Strips frontmatter, HTML comments and code so only prose is checked. */
+const keepLines = (m: string) => m.replace(/[^\n]/g, '');
+
+/** Blanks out frontmatter, HTML comments and code (keeping line breaks, so line numbers stay true). */
 export function proseOf(markdown: string): string {
   return markdown
-    .replace(/^---\n[\s\S]*?\n---\n/, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/`[^`]*`/g, '');
+    .replace(/\r\n?/g, '\n')
+    .replace(/^---\n[\s\S]*?\n---\n/, keepLines)
+    .replace(/<!--[\s\S]*?-->/g, keepLines)
+    .replace(/```[\s\S]*?```/g, keepLines)
+    .replace(/`[^`\n]*`/g, '');
 }
 
 function lineOf(text: string, index: number): number {
@@ -44,10 +47,13 @@ export function checkStyle(markdown: string, profileId = 'ru-technical'): StyleR
   const findings: StyleFinding[] = [];
 
   for (const rule of profile.rules) {
-    const scope = rule.withinFirstChars ? text.trimStart().slice(0, rule.withinFirstChars) : text;
+    const lead = rule.withinFirstChars ? text.length - text.trimStart().length : 0;
+    const scope = rule.withinFirstChars ? text.slice(lead, lead + rule.withinFirstChars) : text;
     const flags = rule.pattern.flags.includes('g') ? rule.pattern.flags : `${rule.pattern.flags}g`;
     for (const m of scope.matchAll(new RegExp(rule.pattern.source, flags))) {
-      findings.push({ rule: rule.id, severity: rule.severity, message: rule.message, line: lineOf(scope, m.index ?? 0), excerpt: m[0].trim().slice(0, 80) });
+      const at = m.index ?? 0;
+      const skipped = m[0].length - m[0].trimStart().length;
+      findings.push({ rule: rule.id, severity: rule.severity, message: rule.message, line: lineOf(text, lead + at + skipped), excerpt: m[0].trim().slice(0, 80) });
       if (rule.withinFirstChars) break;
     }
   }

@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { EditorialError } from '../shared/errors.js';
+import { StoryOpsError } from '../shared/errors.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -13,7 +13,7 @@ async function git(cwd: string, args: string[], maxBuffer = 64 * 1024 * 1024): P
     const { stdout } = await execFileAsync('git', ['-c', 'core.quotepath=off', '--no-pager', ...args], { cwd, maxBuffer, env: { ...process.env, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' } });
     return stdout;
   } catch (error) {
-    throw new EditorialError('GIT_FAILED', `git ${args[0]} failed in ${cwd}`, { cause: error });
+    throw new StoryOpsError('GIT_FAILED', `git ${args[0]} failed in ${cwd}`, { cause: error });
   }
 }
 

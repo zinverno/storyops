@@ -1,33 +1,21 @@
 import path from 'node:path';
 import { readdir } from 'node:fs/promises';
-import { pathExists, readJson, writeJson } from '../shared/fs.js';
-import type { WorkspacePaths } from '../shared/workspace.js';
+import { pathExists, readJson } from '../shared/fs.js';
 import { publicationSchema, type Publication } from './schema.js';
 
 /**
- * Publications are stored one file per publication under
- * `.editorial/publications/<platform>/<id>.json` so that diffs stay readable
- * and manual edits are easy.
+ * Reads a v2 publication directory (`.editorial/publications/<platform>/<id>.json`,
+ * one file per publication). In v3 publications live in the database; this
+ * is used by `storyops migrate`.
  */
-export function publicationFile(workspace: WorkspacePaths, publication: Pick<Publication, 'platform' | 'id'>): string {
-  const localId = publication.id.replace(/^[^:]+:/, '').replace(/[^a-zA-Z0-9._-]+/g, '-');
-  return path.join(workspace.publicationsDir, publication.platform, `${localId}.json`);
-}
-
-export async function savePublication(workspace: WorkspacePaths, publication: Publication): Promise<string> {
-  const file = publicationFile(workspace, publication);
-  await writeJson(file, publicationSchema.parse(publication));
-  return file;
-}
-
-export async function loadPublications(workspace: WorkspacePaths): Promise<Publication[]> {
-  if (!pathExists(workspace.publicationsDir)) return [];
+export async function loadPublicationFiles(dir: string): Promise<Publication[]> {
+  if (!pathExists(dir)) return [];
   const results: Publication[] = [];
-  const platforms = (await readdir(workspace.publicationsDir, { withFileTypes: true })).filter((e) => e.isDirectory());
+  const platforms = (await readdir(dir, { withFileTypes: true })).filter((e) => e.isDirectory());
   for (const platform of platforms.sort((a, b) => a.name.localeCompare(b.name))) {
-    const dir = path.join(workspace.publicationsDir, platform.name);
-    const files = (await readdir(dir)).filter((f) => f.endsWith('.json')).sort();
-    for (const file of files) results.push(await readJson(path.join(dir, file), publicationSchema));
+    const sub = path.join(dir, platform.name);
+    const files = (await readdir(sub)).filter((f) => f.endsWith('.json') && f !== 'index.json').sort();
+    for (const file of files) results.push(await readJson(path.join(sub, file), publicationSchema));
   }
   return sortPublications(dedupePublications(results));
 }

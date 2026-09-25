@@ -153,6 +153,46 @@ commit("2025-06-10T12:00:00+03:00", "fix: stale link detection on renamed notes"
     "src/knowledge/links.ts": "export function staleLinks(links: Array<{ from: string; to: string }>, existing: Set<string>, renamed = new Map<string, string>()) {\n  return links.filter((l) => !existing.has(renamed.get(l.to) ?? l.to));\n}\n",
 })
 
+ADR4 = """# ADR-0004: Reconciliation receipts
+
+## Status
+
+Accepted
+
+## Context
+
+After a restart, the analysis rebuilt findings from the vault and matched them to stored
+findings by rule and note path. A finding the user had resolved could come back as open
+when the note was renamed in between, because nothing recorded what the last analysis
+had actually seen.
+
+## Decision
+
+Every analysis run writes a reconciliation receipt: which notes it saw, with content
+hashes, and which stored findings it confirmed, resolved or left untouched. On the next
+run, stored findings are reconciled against the last receipt before new findings are
+added.
+
+## Consequences
+
+- Resolved findings survive restarts and renames.
+- Freshness is only checked when an analysis runs; between runs a finding can be stale.
+- Receipts add one table (`src/storage/migrations/002-receipts.sql`).
+"""
+
+# --- after a long pause: reconciliation (2026) ---
+commit("2026-08-05T12:00:00+03:00", "feat(reconciliation): reconciliation receipts for persisted findings", write={
+    "src/reconciliation/receipts.ts": "export interface Receipt { runId: string; seen: Record<string, string>; confirmed: string[]; resolved: string[] }\n\nexport function receiptFor(runId: string, seen: Map<string, string>): Receipt {\n  return { runId, seen: Object.fromEntries(seen), confirmed: [], resolved: [] };\n}\n",
+    "src/reconciliation/reconcile.ts": "import type { Receipt } from './receipts.js';\n\nexport function reconcile(stored: Array<{ id: string; note: string; state: string }>, last: Receipt | undefined) {\n  if (!last) return stored;\n  return stored.map((f) => (f.state === 'resolved' && !(f.note in last.seen) ? f : f));\n}\n",
+    "src/storage/migrations/002-receipts.sql": "CREATE TABLE receipts (run_id TEXT PRIMARY KEY, seen TEXT NOT NULL, created_at TEXT NOT NULL);\n",
+    "tests/reconciliation/receipts.test.ts": "import { test } from 'node:test';\nimport assert from 'node:assert';\nimport { receiptFor } from '../../src/reconciliation/receipts.js';\n\ntest('receipt records seen notes', () => {\n  assert.deepEqual(Object.keys(receiptFor('r1', new Map([['a.md', 'h1']])).seen), ['a.md']);\n});\n",
+})
+commit("2026-08-07T12:00:00+03:00", "docs: ADR-0004 reconciliation receipts", write={"docs/adr/0004-reconciliation-receipts.md": ADR4})
+commit("2026-08-12T12:00:00+03:00", "fix(reconciliation): resolved findings reappeared as open after a restart", write={
+    "src/reconciliation/reconcile.ts": "import type { Receipt } from './receipts.js';\n\nexport function reconcile(stored: Array<{ id: string; note: string; state: string }>, last: Receipt | undefined, renamed = new Map<string, string>()) {\n  if (!last) return stored;\n  return stored.map((f) => ({ ...f, note: renamed.get(f.note) ?? f.note }));\n}\n",
+    "tests/reconciliation/restart.test.ts": "import { test } from 'node:test';\nimport assert from 'node:assert';\nimport { reconcile } from '../../src/reconciliation/reconcile.js';\n\ntest('resolved finding stays resolved after a rename and a restart', () => {\n  const out = reconcile([{ id: 'f1', note: 'old.md', state: 'resolved' }], { runId: 'r1', seen: { 'old.md': 'h' }, confirmed: [], resolved: ['f1'] }, new Map([['old.md', 'new.md']]));\n  assert.equal(out[0]!.state, 'resolved');\n});\n",
+})
+
 with open(os.path.join(HERE, 'history.json'), 'w', encoding='utf-8') as f:
     json.dump({"comment": "Fictional scripted history for the notegarden fixture project. Replayed by src/demo/fixture-repo.ts.", "author": {"name": "Fixture Author", "email": "fixture@example.invalid"}, "commits": commits}, f, ensure_ascii=False, indent=2)
     f.write('\n')
