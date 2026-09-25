@@ -197,3 +197,18 @@ describe('voice plan', () => {
     expect(validateVoicePlan(refreshed, { story, authorInput: edited, patternTransfer: pt }).some((i) => /references author input item .* no longer exists/.test(i.message))).toBe(true);
   });
 });
+
+describe('editorial direction refresh', () => {
+  it('a new publication type resets the length range and asks for review', async () => {
+    const catalog = await loadStyleCatalog({ builtInDir: STYLES_DIR });
+    const base: DirectionInput = {
+      story: exampleStory(), strategy: habrStrategy(), publicationType: 'architecture-deep-dive', style: catalog.get('engineering-story'), styleChosenBy: 'user', styleCandidates: [], authorInput: authorInput(),
+      authorVoice: { styleProfile: 'ru-technical', tone: '', voiceNotes: [] }, voiceCandidates: [],
+      references: { story: 's', evidence: 'e', brief: null, authorInput: 'a', authorProfile: null, patternTransfer: 'p', voicePlan: 'v', research: null }, basedOn: provenance(), now: NOW,
+    };
+    const first = buildDirection(base);
+    const changed = buildDirection({ ...base, publicationType: 'product-update', previous: first });
+    expect(changed.lengthRange).toMatchObject({ min: 500, max: 1500 });
+    expect(changed.reviewRequired[0]).toMatch(/publication type changed from "architecture-deep-dive" to "product-update"/);
+  });
+});

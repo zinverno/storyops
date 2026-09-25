@@ -28,7 +28,7 @@ import { collisionWorkflow, researchWorkflow } from '../workflow/research.js';
 import { screenshotCaptureWorkflow, screenshotPlanWorkflow } from '../workflow/screenshots.js';
 import { briefWorkflow, createWorkflow, evidenceWorkflow, repurposeWorkflow, storyCreateWorkflow } from '../workflow/story.js';
 import { editorialAuditWorkflow, editorialPlanWorkflow, editorialValidateWorkflow, inputAddWorkflow, inputInitWorkflow, loadAuthorInput, loadStyles } from '../workflow/editorial.js';
-import { abbreviate, itemsByPriority, materialPrioritySchema, type MaterialPriority } from '../editorial/author-input.js';
+import { abbreviate, itemsByPriority, materialPrioritySchema, PRIORITY_TO_SECTION, sectionDef, type MaterialPriority } from '../editorial/author-input.js';
 import { renderStylePreset } from '../editorial/styles.js';
 
 interface GlobalOptions {
@@ -359,7 +359,7 @@ input
   .requiredOption('--text <text>', 'the item (quote it in the shell; multi-line text is fine)')
   .action(async (o: { story: string; priority: MaterialPriority; text: string }) => {
     const r = await inputAddWorkflow(path.resolve(o.story), o.priority, o.text);
-    out({ file: r.file, item: r.item }, `Added ${o.priority.toUpperCase()} item ${r.item.id} to ${rel(r.file)}.`);
+    out({ file: r.file, item: r.item }, `Added ${sectionDef(PRIORITY_TO_SECTION[o.priority]).heading} item ${r.item.id} to ${rel(r.file)}.`);
   });
 input
   .command('show')

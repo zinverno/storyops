@@ -139,6 +139,8 @@ export function buildDirection(input: DirectionInput): EditorialDirection {
   // Conflicts the editor added by hand (kind "other") are kept.
   for (const c of previous?.conflicts ?? []) if (c.kind === 'other' && !conflicts.some((x) => x.id === c.id)) conflicts.push(c);
   const humorItems = input.authorInput.items.filter((i) => i.section === 'humor').length;
+  const typeChanged = previous !== undefined && previous.publicationType !== input.publicationType;
+  const review = [...(input.reviewRequired ?? []), ...(typeChanged ? [`publication type changed from "${previous!.publicationType}" to "${input.publicationType}"; the length range was reset from the platform strategy — review this plan, then clear reviewRequired.`] : [])];
 
   return directionSchema.parse({
     schemaVersion: EDITORIAL_DIRECTION_SCHEMA_VERSION,
@@ -148,7 +150,7 @@ export function buildDirection(input: DirectionInput): EditorialDirection {
     generatedAt: previous?.generatedAt ?? input.now,
     updatedAt: input.now,
     basedOn: input.basedOn,
-    reviewRequired: [...new Set([...(previous?.reviewRequired ?? []), ...(input.reviewRequired ?? [])])],
+    reviewRequired: [...new Set([...(previous?.reviewRequired ?? []), ...review])],
     references: input.references,
     style: preset
       ? {
@@ -173,7 +175,7 @@ export function buildDirection(input: DirectionInput): EditorialDirection {
     humorPolicy: keep('humorPolicy', todo(`humor policy (style: ${preset?.humorLevel ?? '?'}; author humor items: ${humorItems})`)),
     codePolicy: keep('codePolicy', todo(`code policy (style: ${preset?.codeUsage ?? '?'}; platform: ${strategy.structure.code})`)),
     visualPolicy: keep('visualPolicy', todo(`visual policy (style: ${preset?.visualUsage ?? '?'}; platform screenshots: ${strategy.media.screenshots}, diagrams: ${strategy.media.diagrams})`)),
-    lengthRange: previous?.lengthRange ?? (range ? { min: range.min, max: range.max, unit: range.unit, source: `${strategy.id}@${strategy.version} ${input.publicationType} (${range.kind})` } : null),
+    lengthRange: previous && !typeChanged ? previous.lengthRange : (range ? { min: range.min, max: range.max, unit: range.unit, source: `${strategy.id}@${strategy.version} ${input.publicationType} (${range.kind})` } : null),
     material: {
       mustAppear: [...by.verbatim, ...by.must].map((i) => ({ itemId: i.id, priority: i.priority, text: i.text })),
       mustNotAppear: by.avoid.map((i) => ({ itemId: i.id, priority: i.priority, text: i.text })),
