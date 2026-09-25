@@ -54,24 +54,46 @@ Use the product-screenshots skill: plan from `possibleVisuals`, capture with
 `editorial-kit screenshots capture --plan …`. Reference captured images as
 `screenshot:<file>` evidence in the story when they prove a claim.
 
+## Editorial layer (after the story is ready)
+
+```bash
+editorial-kit input init --story articles/<slug>/story.json          # author-input.md (empty is fine)
+# the author throws in phrases, anecdotes, jokes; or:
+editorial-kit input add --story articles/<slug>/story.json --priority verbatim --text "…"
+editorial-kit styles list                                            # propose 2–3 if the user named none
+editorial-kit editorial plan --story articles/<slug>/story.json --platform habr --style engineering-story
+# fill editorial/pattern-transfer.json, direction.json, voice-plan.json (see the references)
+editorial-kit editorial validate --story articles/<slug>/story.json --platform habr
+```
+
+`editorial plan` is safe to re-run: it keeps your decisions, adds new author items as pending and,
+when an input changed (story, author input, author profile, style, strategy, research snapshot),
+records `reviewRequired` entries. `editorial validate` fails until they are reviewed and cleared.
+The `.md` files are views of the `.json` files; `plan` and `validate` regenerate them.
+A second platform gets its own plan in `editorial/<platform>/`.
+
+Long-form: write `editorial/voice-sample.md` (400–800 words, central episode) and show it before the full draft.
+
 ## 16. Drafting
 
 ```bash
 editorial-kit repurpose articles/<slug>/story.json -p habr --type architecture-deep-dive
 ```
 
-The draft workspace lists, per section, the purpose and the story facts it may
-use. Replace the TODOs with prose; delete the HTML comments before publishing.
-Sections without story facts are omitted, not padded.
+The draft workspace lists, per section, the purpose and the story facts it may use: a fact checklist, not a
+template. Write from the voice plan ([drafting.md](drafting.md)); delete the HTML comments before publishing.
+Without an editorial plan, `repurpose` says so; plan first for long-form prose.
 
-For another platform, run `repurpose` again with another `-p`. Read the story
+For another platform, run `editorial plan` and `repurpose` again with another `-p`. Read the story
 again; do not open the other outputs.
 
 ## 17–20. Verification
 
 1. Fact-check (fact-check.md).
-2. Continuity: compare with the brief's "must not be re-explained" list.
-3. `editorial-kit style articles/<slug>/outputs/<platform>.md`.
-4. `editorial-kit evidence verify -s articles/<slug>/story.json` right before publishing (detects drift).
+2. `editorial-kit editorial audit --story articles/<slug>/story.json --platform <id> --output articles/<slug>/outputs/<id>.md`;
+   record incorporation in `editorial/audit.json` and re-run until there are no errors ([editorial-audit.md](editorial-audit.md)).
+3. Continuity: compare with the brief's "must not be re-explained" list.
+4. `editorial-kit style articles/<slug>/outputs/<platform>.md` (also summarised in the audit).
+5. `editorial-kit evidence verify -s articles/<slug>/story.json` right before publishing (detects drift).
 
 Publishing itself is manual in v1.

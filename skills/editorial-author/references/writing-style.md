@@ -13,6 +13,7 @@ Natural technical Russian. A developer discussing a real project with other deve
 - Do not repeat «не X, а Y». Once per article is plenty.
 - Do not overuse long em dashes (—). Commas, colons and separate sentences work.
 - Moderate humour is fine when it is natural. No fake drama.
+- First person where the author made the decision or supplied the experience.
 - Never invent personal experiences, failures, users or production adoption.
 - Explain architecture through the engineering problem it solves.
 - Mention limitations when evidence exists.
@@ -36,11 +37,22 @@ publication**, with a link to it, instead of retelling the project origin.
 | «Производительность выросла в разы.» | «Полный прогон по N заметкам: X с до, Y с после (замер: `bench/…`).» with a real measurement, or drop the claim. |
 | «Это не просто аудит, а целая платформа.» | «Аудит стал постоянной моделью: находки живут между запусками.» |
 
-## Author voice vs platform
+## Author voice vs style vs platform
 
-The author's voice (`.editorial/author-profile.md`, `manual` section) is stable
-across platforms. Platform strategies change packaging: length, density,
-formatting, opening. Telegram may be more informal; LinkedIn more compact; the
-person speaking is the same.
+The author's voice (`.editorial/author-profile.md`, `manual` section, plus what
+the author writes in `author-input.md`) is stable across platforms and styles.
+A style preset decides what kind of piece this is; a platform strategy changes
+packaging: length, density, formatting, opening. Telegram may be more informal;
+LinkedIn more compact; the person speaking is the same. Voice outranks style,
+style outranks platform, and trends come last.
+
+Optional voice samples: up to three of the author's own publications, chosen in
+`direction.json → authorVoiceReferences`, for sentence rhythm, degree of
+informality, first-person usage, transitions and humor. Use them as guidance,
+not as sentences to recycle (unless marked `reusable`). Never use another
+author's writing as a voice template.
+
+Prose that reads like documentation is a style failure even when every fact is
+right; see [drafting.md](drafting.md).
 
 `editorial-kit style <file>` checks these rules mechanically. It reports; you decide.

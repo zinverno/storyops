@@ -36,7 +36,8 @@ export function renderBrief(b: Brief): string {
       b.packaging.map((p) => `${p.advisory ? '(advisory) ' : ''}${p.text} — _source: ${p.source}; ${p.provenance}_`),
     ),
     ...section('Length target', b.lengthTarget),
-    '_Priority: factual truth > author voice > narrative continuity > platform strategy > current trend patterns._',
+    '_Priority: factual truth > explicit author material > author voice > article style > narrative continuity > platform strategy > current trend patterns._',
+    '_This brief is a factual/editorial input, not a prose template: draft from the editorial direction and voice plan (`editorial-kit editorial plan`)._',
     '',
   ].join('\n');
 }

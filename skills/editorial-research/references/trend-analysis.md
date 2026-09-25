@@ -50,3 +50,27 @@ when the story genuinely supports them.
 
 The snapshot date and age must accompany every use. If live research failed,
 say so and name the fallback snapshot date.
+
+## Pattern transfer
+
+Observations are abstract statements about a sample. Pattern transfer records,
+per article, what an observation means for **this** story:
+
+| Observation | Strength | Decision | Our use | Placement |
+| --- | --- | --- | --- | --- |
+| Higher-momentum engineering articles surface a concrete conflict early. | moderate | apply | Open with the real engineering problem before the project history. | opening + first technical section |
+| Higher-momentum articles report measurements more often. | moderate | skip | No measurements exist; numbers are never added to follow a trend. | — |
+| AI headlines are saturated in the sample. | notable | skip / adapt | The story has no AI angle; do not add one. | title |
+
+Rules:
+
+- Weak observations start as `skip` (deterministic default); promote one only with a story-specific reason.
+- Every decision has a rationale; apply/adapt also need a placement and a concrete consequence.
+- Author input and author voice override trends; record `conflictsWithAuthorItems` when they collide.
+- Never store titles, passages or openings of researched articles in the artifact (validation rejects
+  wording shared with researched titles). Never turn a successful title into a template.
+- A trend pattern is never evidence and never a story claim.
+- The post-draft audit asks where each applied pattern shaped the article; unused ones are warnings,
+  `overridden-by-author` is valid.
+- No engagement scores, viral probability, predicted views or headline CTR. Observations describe a sample;
+  they promise nothing.
