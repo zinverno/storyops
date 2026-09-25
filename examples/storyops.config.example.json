@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "language": "ru",
   "author": {
     "name": "Author Name",
@@ -16,9 +16,13 @@
       "aliases": ["myproject"],
       "glossary": [
         "архитектура",
-        { "term": "жизненный цикл находок", "aliases": ["finding lifecycle", "findings"] }
+        { "term": "жизненный цикл находок", "aliases": ["finding lifecycle", "findings"], "related": ["architecture"] },
+        { "term": "квитанции сверки", "id": "reconciliation", "aliases": ["reconciliation", "receipts"], "related": ["databases"] }
       ]
     }
+  ],
+  "topics": [
+    { "id": "stateful-ai-tooling", "label": "Stateful AI tooling", "aliases": ["stateful agent", "agent memory", "память агента"], "parent": "ai-generic", "specificity": "technology" }
   ],
   "research": {
     "cacheTtlHours": 24,
@@ -38,6 +42,16 @@
     "linkedin": { "enabled": true },
     "telegram": { "enabled": true },
     "generic-blog": { "enabled": true }
+  },
+  "analysis": {
+    "windowDays": 30,
+    "saturation": { "minSample": 15, "highlySaturatedShare": 0.3, "crowdedShare": 0.15, "activeShare": 0.05 },
+    "trends": { "windowDays": 7, "minPoints": 3, "changeThreshold": 0.2 },
+    "outdatedAfterDays": 730
+  },
+  "review": {
+    "profile": "engineering-story",
+    "maxAlternativeChars": 240
   },
   "screenshots": {
     "viewport": { "width": 1440, "height": 1000 },

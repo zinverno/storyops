@@ -1,7 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { cp, readdir, rm, symlink } from 'node:fs/promises';
-import { EditorialError } from '../shared/errors.js';
+import { StoryOpsError } from '../shared/errors.js';
 import { ensureDir, pathExists } from '../shared/fs.js';
 
 export type SkillAgent = 'claude' | 'codex';
@@ -35,7 +35,7 @@ export function skillTargetDir(agent: SkillAgent, scope: SkillScope, projectRoot
 /** Resolves the install destination: an explicit target always wins over --agent/--scope. */
 export function resolveInstallTarget(options: { agent?: SkillAgent; scope?: SkillScope; target?: string; projectRoot: string } & TargetEnvironment): string {
   if (options.target) return path.resolve(options.projectRoot, options.target);
-  if (!options.agent) throw new EditorialError('SKILLS_TARGET', 'Choose where to install: --agent claude|codex [--scope project|user] or --target <dir>');
+  if (!options.agent) throw new StoryOpsError('SKILLS_TARGET', 'Choose where to install: --agent claude|codex [--scope project|user] or --target <dir>');
   return skillTargetDir(options.agent, options.scope ?? 'project', options.projectRoot, options.home ? { home: options.home } : {});
 }
 
@@ -46,7 +46,7 @@ export interface InstallResult {
 }
 
 export async function installSkills(sourceRoot: string, target: string, options: { link?: boolean; force?: boolean; only?: string[] } = {}): Promise<InstallResult> {
-  if (!pathExists(sourceRoot)) throw new EditorialError('SKILLS_SOURCE', `Skills directory not found: ${sourceRoot}`);
+  if (!pathExists(sourceRoot)) throw new StoryOpsError('SKILLS_SOURCE', `Skills directory not found: ${sourceRoot}`);
   await ensureDir(target);
   const result: InstallResult = { installed: [], skipped: [], target };
   const skills = (await readdir(sourceRoot, { withFileTypes: true })).filter((e) => e.isDirectory() && (!options.only || options.only.includes(e.name)));

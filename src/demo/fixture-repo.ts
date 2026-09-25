@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
-import { EditorialError } from '../shared/errors.js';
+import { StoryOpsError } from '../shared/errors.js';
 import { pathExists } from '../shared/fs.js';
 
 const run = promisify(execFile);
@@ -65,7 +65,7 @@ export async function buildFixtureRepo(historyFile: string, target: string): Pro
     try {
       await git(['commit', '-q', '--no-verify', '-m', c.message], env);
     } catch (error) {
-      throw new EditorialError('FIXTURE_REPO', `Could not replay commit "${c.message}"`, { cause: error });
+      throw new StoryOpsError('FIXTURE_REPO', `Could not replay commit "${c.message}"`, { cause: error });
     }
     if (c.tag) await git(['tag', c.tag], env);
   }

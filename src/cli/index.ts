@@ -3,33 +3,36 @@ import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { Command, Option } from 'commander';
 import { createDefaultRegistry } from '../../platforms/registry.js';
-import { checkStyle } from '../author/style-check.js';
-import { detectDrift } from '../evidence/collect.js';
-import { evidenceMapSchema } from '../evidence/schema.js';
-import { loadPublications } from '../publications/store.js';
+import { COVERAGE_LABEL, coverageText } from '../author/coverage.js';
+import { loadPublications } from '../author/store.js';
+import { parseConfig, resolveConfigFile } from '../config/load.js';
+import { runDemo } from '../demo/run.js';
+import { packageRoot } from '../demo/paths.js';
+import { dimensionSummary } from '../opportunity/render.js';
+import { eventDate } from '../repo/events.js';
 import { HttpCache } from '../research/cache.js';
-import { EditorialError, errorMessage } from '../shared/errors.js';
-import { readJson } from '../shared/fs.js';
+import { loadProfileCatalog, renderProfile } from '../review/profiles.js';
+import { latestReviewId, listFindings, setFindingStatus } from '../review/store.js';
+import { findingStatusSchema } from '../review/types.js';
+import { systemClock } from '../shared/clock.js';
+import { StoryOpsError, errorMessage } from '../shared/errors.js';
 import { createLogger, type Logger, type LogLevel } from '../shared/logger.js';
 import { resolveWorkspace } from '../shared/workspace.js';
 import { installSkills, resolveInstallTarget, type SkillAgent, type SkillScope } from '../skills/install.js';
 import { validateSkillsDir } from '../skills/validate.js';
-import { loadStory } from '../stories/store.js';
-import { validateStory } from '../stories/validate.js';
-import { runDemo } from '../demo/run.js';
-import { runEditorialDemo } from '../demo/editorial.js';
-import { packageRoot } from '../demo/paths.js';
-import { authorSync, importPublication, rebuildAuthorMemory } from '../workflow/author.js';
-import { loadContext, type AppContext } from '../workflow/context.js';
+import { authorSync, coverageWorkflow, importPublication, overlapWorkflow, rebuildAuthorMemory } from '../workflow/author.js';
+import { db, loadContext, saveDb, workspaceFor, type AppContext } from '../workflow/context.js';
+import { dbBackupWorkflow, dbRebuildWorkflow, dbStatsWorkflow, dbStatusWorkflow, dbVacuumWorkflow } from '../workflow/db.js';
 import { runDoctor } from '../workflow/doctor.js';
 import { initWorkspace } from '../workflow/init.js';
-import { inspectProjectWorkflow, narrativeGapWorkflow, requireProject } from '../workflow/project.js';
-import { collisionWorkflow, researchWorkflow } from '../workflow/research.js';
-import { screenshotCaptureWorkflow, screenshotPlanWorkflow } from '../workflow/screenshots.js';
-import { briefWorkflow, createWorkflow, evidenceWorkflow, repurposeWorkflow, storyCreateWorkflow } from '../workflow/story.js';
-import { editorialAuditWorkflow, editorialPlanWorkflow, editorialValidateWorkflow, inputAddWorkflow, inputInitWorkflow, loadAuthorInput, loadStyles } from '../workflow/editorial.js';
-import { abbreviate, itemsByPriority, materialPrioritySchema, PRIORITY_TO_SECTION, sectionDef, type MaterialPriority } from '../editorial/author-input.js';
-import { renderStylePreset } from '../editorial/styles.js';
+import { migrateWorkspace, renderMigration } from '../workflow/migrate.js';
+import { eventsWorkflow, inspectRepoWorkflow, repoTopicsWorkflow } from '../workflow/repo.js';
+import { importDatasetWorkflow, listTopicsWorkflow, patternsWorkflow, researchHistoryWorkflow, researchPlatformWorkflow, saturationWorkflow, topicTrendWorkflow, trendsWorkflow } from '../workflow/research.js';
+import { reviewWorkflow } from '../workflow/review.js';
+import { screenshotCaptureWorkflow } from '../workflow/screenshots.js';
+import { compareWorkflow, discoverWorkflow, showWorkflow } from '../workflow/topics.js';
+
+export const VERSION = '0.3.0';
 
 interface GlobalOptions {
   cwd?: string;
@@ -40,15 +43,19 @@ interface GlobalOptions {
   logFormat?: 'text' | 'json';
 }
 
+const invokedAs = path.basename(process.argv[1] ?? 'storyops').replace(/\.js$/, '');
+
 const program = new Command();
 program
-  .name('editorial-kit')
+  .name('storyops')
   .description(
-    'Evidence-backed editorial toolkit: author memory, project research, continuity, narrative gap, platform research, canonical stories, evidence, screenshots and platform strategies.\nIt prepares and checks material; the author (or an AI agent using the bundled Agent Skills) writes the prose.',
+    'StoryOps — research and review for technical authors.\n' +
+      'Platform research, topic discovery, repository opportunity mining, author coverage and read-only article review.\n' +
+      'StoryOps analyses. The human writes. It never drafts, rewrites or repurposes articles.',
   )
-  .version('0.1.0')
+  .version(VERSION)
   .option('-C, --cwd <dir>', 'workspace root (default: current directory)')
-  .option('-c, --config <file>', 'config file relative to the workspace root', 'editorial.config.json')
+  .option('-c, --config <file>', 'config file relative to the workspace root (default: storyops.config.json, else legacy editorial.config.json)')
   .option('-v, --verbose', 'debug logging')
   .option('-q, --quiet', 'only warnings and errors')
   .option('--json', 'print machine-readable JSON results on stdout')
@@ -70,7 +77,7 @@ function root(): string {
 }
 
 async function ctx(): Promise<AppContext> {
-  return loadContext({ root: root(), configFile: globals().config ?? 'editorial.config.json', logger: logger() });
+  return loadContext({ root: root(), ...(globals().config ? { configFile: globals().config } : {}), logger: logger() });
 }
 
 /** Prints a result: JSON with --json, otherwise the human text. */
@@ -79,440 +86,539 @@ function out(json: unknown, text: string | string[]): void {
   else process.stdout.write(`${Array.isArray(text) ? text.join('\n') : text}\n`);
 }
 
+function deprecated(message: string): void {
+  process.stderr.write(`DEPRECATED: ${message}\n`);
+}
+
 const rel = (p: string) => path.relative(process.cwd(), p) || p;
 const list = (value: string) => value.split(',').map((s) => s.trim()).filter(Boolean);
+const days = (value: string) => {
+  const m = value.match(/^(\d+)\s*d?$/i);
+  if (!m) throw new StoryOpsError('BAD_PERIOD', `Period must look like 30d or 30, got "${value}"`);
+  return Number(m[1]);
+};
+const pct = (n: number) => `${Math.round(n * 100)}%`;
 
 // ------------------------------------------------------------------ setup
 program
   .command('init')
-  .description('create editorial.config.json, .editorial/ and articles/, and add recommended .gitignore entries')
+  .description('create storyops.config.json, the .storyops/ data directory and database, topics/ and reviews/')
   .option('--author <name>', 'author name')
   .option('--habr <profileUrl>', 'public Habr profile URL, e.g. https://habr.com/ru/users/<username>/')
   .option('--force', 'overwrite an existing config')
   .action(async (o: { author?: string; habr?: string; force?: boolean }) => {
     const result = await initWorkspace(root(), { ...(o.force ? { force: true } : {}), ...(o.author ? { authorName: o.author } : {}), ...(o.habr ? { habrProfile: o.habr } : {}) });
-    out(result, [...result.created.map((f) => `created ${rel(f)}`), ...result.updated.map((f) => `updated ${rel(f)}`), ...result.skipped.map((f) => `kept existing ${rel(f)} (use --force to overwrite)`), '', 'Next: edit editorial.config.json (author, projects), then run `editorial-kit doctor`.']);
+    out(result, [...result.created.map((f) => `created ${rel(f)}`), ...result.updated.map((f) => `updated ${rel(f)}`), ...result.skipped.map((f) => `kept existing ${rel(f)} (use --force to overwrite)`), '', 'Next: edit storyops.config.json (author, projects), then run `storyops doctor`.']);
   });
 
 program
   .command('doctor')
-  .description('check Node, config, workspace, git, Playwright/browser, directories, platforms and bundled skills')
-  .option('--browser', 'actually launch Chromium')
+  .description('check Node, config, database, git, directories, platforms, review profiles and bundled skills')
+  .option('--browser', 'launch Chromium (only the optional screenshot utility needs it)')
   .action(async (o: { browser?: boolean }) => {
-    const checks = await runDoctor({ root: root(), configFile: globals().config ?? 'editorial.config.json', ...(o.browser ? { launchBrowser: true } : {}) });
+    const checks = await runDoctor({ root: root(), ...(globals().config ? { configFile: globals().config } : {}), ...(o.browser ? { launchBrowser: true } : {}) });
     const icon = { ok: '✓', warn: '!', fail: '✗' } as const;
     out(checks, checks.map((c) => `${icon[c.status]} ${c.name}: ${c.message}${c.hint ? `\n    → ${c.hint}` : ''}`));
     if (checks.some((c) => c.status === 'fail')) process.exitCode = 1;
   });
 
-// ----------------------------------------------------------------- author
-const author = program.command('author').description('author memory: publication history, index, profile');
-author
-  .command('sync')
-  .description('collect public publications from configured author profiles (live adapters: habr), then rebuild index, continuity and profile')
-  .option('-p, --platform <ids>', 'comma-separated platform ids', list)
-  .option('--max <n>', 'maximum publications per platform', (v) => Number(v), 100)
-  .option('--refresh', 'ignore fresh cache entries')
-  .option('--offline', 'use cached pages only')
-  .action(async (o: { platform?: string[]; max: number; refresh?: boolean; offline?: boolean }) => {
-    const c = await ctx();
-    const result = await authorSync(c, { maxArticles: o.max, ...(o.platform ? { platforms: o.platform } : {}), ...(o.refresh ? { refresh: true } : {}), ...(o.offline ? { offline: true } : {}) });
-    const memory = await rebuildAuthorMemory(c);
-    out({ ...result, indexed: memory.publications.length }, [
-      `Collected ${result.collected} publication(s): ${Object.entries(result.byPlatform).map(([k, v]) => `${k}=${v}`).join(', ') || 'none'}.`,
-      ...result.skipped.map((s) => `skipped ${s.platform}: ${s.reason}`),
-      ...result.failures.map((f) => `failed ${f.stage}${f.url ? ` ${f.url}` : ''}: ${f.reason}`),
-      `Indexed ${memory.publications.length} publication(s). See ${rel(c.workspace.continuityMd)} and ${rel(c.workspace.authorProfileMd)}.`,
-    ]);
-  });
-author
-  .command('import <file>')
-  .description('import a publication from Markdown (+ optional YAML frontmatter: title, platform, date, url, tags, projects, depth)')
-  .option('-p, --platform <id>', 'platform id (telegram, linkedin, medium, generic-blog, ...)')
-  .option('--url <url>', 'public URL')
-  .option('--date <iso>', 'publication date (ISO 8601)')
-  .action(async (file: string, o: { platform?: string; url?: string; date?: string }) => {
-    const c = await ctx();
-    const { publication, file: stored } = await importPublication(c, path.resolve(file), o);
-    await rebuildAuthorMemory(c);
-    out(publication, `Imported "${publication.title}" (${publication.platform}, ${publication.depth}) → ${rel(stored)}`);
-  });
-author
-  .command('profile')
-  .description('rebuild the publication index, continuity map and author profile from stored publications')
-  .action(async () => {
-    const c = await ctx();
-    const m = await rebuildAuthorMemory(c);
-    out(m.profile, [`Author profile: ${rel(c.workspace.authorProfileMd)}`, `Publication index: ${rel(c.workspace.publicationIndex)}`, `Continuity: ${rel(c.workspace.continuityMd)}`]);
-  });
-
 program
-  .command('publications')
-  .description('list stored publications')
-  .action(async () => {
-    const c = await ctx();
-    const pubs = await loadPublications(c.workspace);
-    out(pubs.map((p) => ({ id: p.id, platform: p.platform, date: p.publicationDate, title: p.title, depth: p.depth })), pubs.map((p) => `${p.publicationDate?.slice(0, 10) ?? 'undated   '}  ${p.platform.padEnd(12)} ${p.depth?.padEnd(8) ?? '        '} ${p.title}`));
-  });
-
-program
-  .command('continuity')
-  .description('rebuild and show the cross-platform continuity map (.editorial/continuity.md)')
-  .action(async () => {
-    const c = await ctx();
-    const { continuity } = await rebuildAuthorMemory(c);
-    out(continuity, [
-      `Continuity map: ${rel(c.workspace.continuityMd)}`,
-      ...continuity.projects.map((p) => `- ${p.name}: ${p.publicationIds.length} publication(s); covered: ${p.coveredAspects.map((a) => a.label).join(', ') || '—'}`),
-      `Unfinished threads: ${continuity.unfinishedThreads.length}`,
-    ]);
-  });
-
-// ---------------------------------------------------------------- project
-const project = program.command('project').description('read-only project/repository research');
-project
-  .command('inspect')
-  .description('inspect the project repository (docs, ADRs, changelog, modules, tests, git history) into .editorial/projects/<id>/report.md')
-  .option('-P, --project <id>', 'project id from the config')
-  .option('--max-commits <n>', 'history limit', (v) => Number(v))
-  .action(async (o: { project?: string; maxCommits?: number }) => {
-    const c = await ctx();
-    const { report, files } = await inspectProjectWorkflow(c, o.project, o.maxCommits ? { maxCommits: o.maxCommits } : {});
-    out(report, [`${report.name}: ${report.modules.filter((m) => m.exists).length} modules, ${report.docs.length} docs, ${report.tests.files} test files, ${report.commits.length} commits, ${report.tags.length} tags.`, ...report.warnings.map((w) => `warning: ${w}`), `Report: ${rel(files.md)}`]);
-  });
-
-program
-  .command('gap')
-  .alias('narrative-gap')
-  .description('narrative gap: what happened in the project that readers have not been told yet')
-  .option('-P, --project <id>', 'project id from the config')
-  .option('--no-reinspect', 'reuse the last project report instead of re-inspecting')
-  .action(async (o: { project?: string; reinspect: boolean }) => {
-    const c = await ctx();
-    const { gap, files } = await narrativeGapWorkflow(c, o.project, { reinspect: o.reinspect });
-    out(gap, [
-      'Already covered:',
-      ...gap.alreadyCovered.map((a) => `- ${a.label} (${a.platform}, ${a.date?.slice(0, 10) ?? 'undated'})`),
-      '',
-      'New in project:',
-      ...gap.newInProject.map((n) => `- ${n}`),
-      '',
-      `Strong narrative gap: ${gap.headline ?? '—'}`,
-      '',
-      `Report: ${rel(files.md)}`,
-    ]);
+  .command('migrate')
+  .description('migrate a v2 (editorial-kit) workspace: config, publications, research snapshots, repository reports, style presets → review profiles. Never deletes anything.')
+  .option('--dry-run', 'only list what would be migrated; create nothing')
+  .action(async (o: { dryRun?: boolean }) => {
+    const r = await migrateWorkspace(root(), { ...(o.dryRun ? { dryRun: true } : {}), logger: logger(), ...(globals().config ? { configFile: globals().config } : {}) });
+    out(r, [renderMigration(r), ...(r.reportFile ? [`Report: ${rel(r.reportFile)}`] : [])]);
   });
 
 // --------------------------------------------------------------- research
-program
+interface ResearchOptions {
+  period?: string[];
+  hub?: string[];
+  max?: number;
+  refresh?: boolean;
+  offline?: boolean;
+}
+
+async function researchPlatformAction(platform: string, o: ResearchOptions): Promise<void> {
+  const c = await ctx();
+  const r = await researchPlatformWorkflow(c, platform, { ...(o.period ? { periods: o.period } : {}), ...(o.hub ? { hubs: o.hub } : {}), ...(o.max ? { maxArticlesPerPeriod: o.max } : {}), ...(o.refresh ? { refresh: true } : {}), ...(o.offline ? { offline: true } : {}) });
+  const s = r.snapshot;
+  out({ snapshot: { platform: s.platform, status: s.status, collectedAt: s.collectedAt, sampleSize: s.sampleSize, observations: s.observations.length }, run: r.run, files: r.files, fallback: r.fallback }, [
+    `${s.platform}: status ${s.status}, ${s.sampleSize} articles, ${s.observations.length} observations, collected ${s.collectedAt}.`,
+    ...(r.run ? [`Research run #${r.run.runId}: ${r.run.newArticles} new article(s), ${r.run.seenAgain} seen again (new metric observations), ${r.run.featuresWritten} feature set(s) stored, ${r.run.featuresUnchanged} unchanged.`] : []),
+    ...(r.fallback ? [`LIVE RESEARCH FAILED (${r.fallback.reason}). Earlier snapshot ${rel(r.fallback.snapshotFile)} is ${r.fallback.ageHours}h old; nothing new was recorded.`] : []),
+    ...(s.status === 'unsupported' ? ['Live research is unsupported for this platform. Import a dataset with `storyops research import <file.json>`.'] : []),
+    ...(r.files ? [`Report: ${rel(r.files.md)}`] : []),
+  ]);
+}
+
+const research = program
   .command('research')
-  .description('platform trend research into a dated snapshot (.editorial/research/<date>/<platform>.md). Advisory only.')
-  .requiredOption('-p, --platform <id>', 'platform id (live research: habr)')
+  .description('platform research and author archive collection; history accumulates in the database')
+  .option('-p, --platform <id>', '(deprecated form) same as `research platform <id>`')
   .option('--period <periods>', 'comma-separated: daily,weekly,monthly', list)
   .option('--hub <hubs>', 'comma-separated hub slugs', list)
   .option('--max <n>', 'max articles per window', (v) => Number(v))
   .option('--refresh', 'ignore fresh cache entries')
   .option('--offline', 'use cached pages only')
-  .action(async (o: { platform: string; period?: string[]; hub?: string[]; max?: number; refresh?: boolean; offline?: boolean }) => {
+  .action(async (o: ResearchOptions & { platform?: string }) => {
+    if (!o.platform) {
+      research.help();
+      return;
+    }
+    deprecated('`research -p <platform>` → use `storyops research platform <platform>`.');
+    await researchPlatformAction(o.platform, o);
+  });
+research
+  .command('platform <id>')
+  .description('collect a dated research sample (live for Habr): metadata, metrics and abstract features only')
+  .option('--period <periods>', 'comma-separated: daily,weekly,monthly', list)
+  .option('--hub <hubs>', 'comma-separated hub slugs', list)
+  .option('--max <n>', 'max articles per window', (v) => Number(v))
+  .option('--refresh', 'ignore fresh cache entries (and re-read article bodies)')
+  .option('--offline', 'use cached pages only')
+  .action(researchPlatformAction);
+research
+  .command('author')
+  .description('collect your public publications (live adapter: Habr) into the archive and rebuild coverage')
+  .option('-p, --platform <ids>', 'comma-separated platform ids', list)
+  .option('--max <n>', 'maximum publications per platform', (v) => Number(v), 100)
+  .option('--refresh', 'ignore fresh cache entries')
+  .option('--offline', 'use cached pages only')
+  .action(async (o: AuthorSyncOptions) => authorSyncAction(o));
+research
+  .command('history')
+  .description('list accumulated research runs')
+  .option('-p, --platform <id>', 'platform id')
+  .option('--limit <n>', 'number of runs', (v) => Number(v), 30)
+  .action(async (o: { platform?: string; limit: number }) => {
     const c = await ctx();
-    const r = await researchWorkflow(c, o.platform, { ...(o.period ? { periods: o.period } : {}), ...(o.hub ? { hubs: o.hub } : {}), ...(o.max ? { maxArticlesPerPeriod: o.max } : {}), ...(o.refresh ? { refresh: true } : {}), ...(o.offline ? { offline: true } : {}) });
-    const s = r.snapshot;
+    const r = await researchHistoryWorkflow(c, { ...(o.platform ? { platform: o.platform } : {}), limit: o.limit });
     out(r, [
-      `${s.platform}: status ${s.status}, ${s.sampleSize} articles, ${s.observations.length} observations, collected ${s.collectedAt}.`,
-      ...(r.fallback ? [`LIVE RESEARCH FAILED (${r.fallback.reason}). Showing earlier snapshot ${rel(r.fallback.snapshotFile)}, ${r.fallback.ageHours}h old.`] : []),
-      ...(s.status === 'unsupported' ? ['live research unsupported for this platform; the stable strategy still applies.'] : []),
-      ...(r.files ? [`Snapshot: ${rel(r.files.md)}`] : []),
+      `${r.articles} article(s), ${r.metricObservations} metric observation(s), ${r.runs.length} run(s) shown.`,
+      ...r.runs.map((x) => `#${String(x.id).padEnd(4)} ${x.collectedAt.slice(0, 16)}  ${x.platform.padEnd(8)} ${x.origin.padEnd(15)} ${String(x.sampleSize).padStart(4)} articles  ${x.label ?? [...x.periods, ...x.hubs].join(',')}`),
     ]);
   });
-
-program
-  .command('collision')
-  .description('topic collision against your publications and the latest research snapshots (deterministic, no embeddings)')
-  .requiredOption('-t, --topic <text>', 'proposed topic')
-  .option('-P, --project <id>', 'project id (adds narrative-gap alternatives)')
-  .option('--description <text>', 'longer description of the proposed angle')
-  .action(async (o: { topic: string; project?: string; description?: string }) => {
-    const c = await ctx();
-    const r = await collisionWorkflow(c, o.topic, { ...(o.project ? { projectId: o.project } : {}), ...(o.description ? { description: o.description } : {}) });
-    out(r, [
-      ...r.summary,
-      '',
-      'Author overlap:',
-      ...r.authorOverlap.slice(0, 3).map((m) => `- [${m.level}] ${m.title} (cosine ${m.cosine}, shared: ${m.sharedTerms.slice(0, 5).join(', ')})`),
-      'Ecosystem overlap:',
-      ...r.ecosystemOverlap.slice(0, 3).map((m) => `- [${m.level}] ${m.title} (cosine ${m.cosine})`),
-      'Alternative angles:',
-      ...r.alternativeAngles.map((a) => `- ${a.angle}`),
-    ]);
-  });
-
-// ---------------------------------------------------------------- stories
-const story = program.command('story').description('canonical story (platform-independent source of truth)');
-story
-  .command('create')
-  .description('create a canonical story skeleton in articles/<slug>/story.json from continuity + narrative gap')
-  .requiredOption('-t, --topic <text>', 'story topic')
-  .option('-P, --project <id>', 'project id')
-  .option('--slug <slug>', 'article slug')
-  .option('--force', 'replace an existing story file')
-  .action(async (o: { topic: string; project?: string; slug?: string; force?: boolean }) => {
-    const c = await ctx();
-    const r = await storyCreateWorkflow(c, { topic: o.topic, ...(o.project ? { projectId: o.project } : {}), ...(o.slug ? { slug: o.slug } : {}), ...(o.force ? { force: true } : {}) });
-    out(r.story, [`Story skeleton: ${rel(r.file)}`, `Pending fields (write them from evidence): ${r.story.pending.join(', ')}`]);
-  });
-story
-  .command('validate <storyFile>')
-  .description('evidence-first gate: is the story ready for drafting?')
+research
+  .command('import <dataset>')
+  .description('import a platform dataset (JSON: metadata, metrics and optional abstract features; no article bodies)')
   .action(async (file: string) => {
-    const s = await loadStory(path.resolve(file));
-    const v = validateStory(s);
-    out(v, [v.readyForDrafting ? 'Ready for drafting.' : 'NOT ready for drafting.', ...v.issues.map((i) => `${i.severity}: [${i.field}] ${i.message}`)]);
-    if (!v.readyForDrafting) process.exitCode = 1;
+    const c = await ctx();
+    const r = await importDatasetWorkflow(c, path.resolve(file));
+    out(r.run, r.run.duplicate ? `Already imported as run #${r.run.runId}; nothing changed.` : `Imported ${r.snapshot.sampleSize} article(s) from ${r.snapshot.platform} as run #${r.run.runId} (${r.run.newArticles} new, ${r.run.seenAgain} seen again).`);
   });
 
-const evidence = program.command('evidence').description('evidence for the story claims (default subcommand: collect)');
-evidence
-  .command('collect', { isDefault: true })
-  .description('collect evidence for the story claims into articles/<slug>/evidence.md')
-  .requiredOption('-s, --story <file>', 'path to story.json')
-  .action(async (o: { story: string }) => {
-    const c = await ctx();
-    const { map, files } = await evidenceWorkflow(c, path.resolve(o.story));
-    out(map, [`Evidence: ${rel(files.md)}`, ...map.claims.map((cl) => `- [${cl.status}] ${cl.text}`), ...map.issues.map((i) => `${i.severity}: ${i.message}`)]);
-    if (map.issues.some((i) => i.severity === 'error')) process.exitCode = 1;
-  });
-evidence
-  .command('verify')
-  .description('detect drift: evidence files that changed or disappeared since collection')
-  .requiredOption('-s, --story <file>', 'path to story.json')
-  .action(async (o: { story: string }) => {
-    const c = await ctx();
-    const s = await loadStory(path.resolve(o.story));
-    const map = await readJson(path.join(path.dirname(path.resolve(o.story)), 'evidence.json'), evidenceMapSchema);
-    const drift = await detectDrift(map, requireProject(c, s.project).root);
-    out(drift, drift.length ? drift.map((d) => `drift: ${d.ref} — ${d.reason}`) : 'No drift: all file evidence matches the recorded content.');
-    if (drift.length) process.exitCode = 1;
-  });
+// ---------------------------------------------------------- trends et al.
+interface TopicTrendOptions {
+  platform?: string;
+  period?: number;
+  window?: number;
+  since?: number;
+  basis?: 'research-runs' | 'publication-dates';
+}
 
-program
-  .command('brief')
-  .description('build the article brief for a platform (articles/<slug>/briefs/<platform>.md)')
-  .requiredOption('-s, --story <file>', 'path to story.json')
-  .requiredOption('-p, --platform <id>', 'platform id')
-  .option('--type <publicationType>', 'publication type, e.g. architecture-deep-dive, short-project-update')
-  .action(async (o: { story: string; platform: string; type?: string }) => {
-    const c = await ctx();
-    const { brief, files } = await briefWorkflow(c, path.resolve(o.story), o.platform, o.type ? { type: o.type } : {});
-    out(brief, [`Brief: ${rel(files.md)}`, brief.readiness.readyForDrafting ? 'Ready for drafting.' : `NOT ready for drafting:\n${brief.readiness.blockers.map((b) => `- ${b}`).join('\n')}`]);
-  });
+async function topicTrendAction(topic: string, o: TopicTrendOptions): Promise<void> {
+  const c = await ctx();
+  const r = await topicTrendWorkflow(c, topic, { ...(o.platform ? { platform: o.platform } : {}), ...(o.period ? { days: o.period } : {}), ...(o.window ? { windowDays: o.window } : {}), ...(o.since ? { sinceDays: o.since } : {}), ...(o.basis ? { basis: o.basis } : {}) });
+  const s = r.saturation;
+  out(r, [
+    `${r.topic.label} on ${s.platform}: saturation ${s.state} — ${s.because.join('; ')}.`,
+    `Trend: ${r.trend.direction} (basis ${r.trend.basis}, ${r.trend.windowDays}-day buckets, ${r.trend.timeRange ? `${r.trend.timeRange.from.slice(0, 10)} → ${r.trend.timeRange.to.slice(0, 10)}` : 'no data'}, sample ${r.trend.sampleSize}).`,
+    ...r.trend.because.map((b) => `  ${b}`),
+    ...r.trend.buckets.map((b) => `  ${b.start.slice(0, 10)} → ${b.end.slice(0, 10)}  ${String(b.count).padStart(3)}/${String(b.sample).padEnd(4)} ${b.share === null ? '   —' : pct(b.share).padStart(4)}${b.usable ? '' : '  (too small)'}`),
+    `Report: ${rel(r.files.md)}`,
+  ]);
+}
 
-program
-  .command('repurpose <storyFile>')
-  .description('re-read the canonical story and apply another platform strategy (never summarises another output)')
-  .requiredOption('-p, --platform <id>', 'target platform id')
-  .option('--type <publicationType>', 'publication type')
-  .option('--force', 'replace an existing non-scaffold output')
-  .action(async (file: string, o: { platform: string; type?: string; force?: boolean }) => {
+const trends = program
+  .command('trends')
+  .description('topic landscape of a platform: share, authors, saturation state, activity and trend direction per topic')
+  .option('-p, --platform <id>', 'platform id (default: research.defaultPlatform)')
+  .option('--period <days>', 'analysis window, e.g. 30d', days)
+  .option('--limit <n>', 'rows', (v) => Number(v), 40)
+  .action(async (o: { platform?: string; period?: number; limit: number }) => {
     const c = await ctx();
-    const r = await repurposeWorkflow(c, path.resolve(file), o.platform, { ...(o.type ? { type: o.type } : {}), ...(o.force ? { force: true } : {}) });
-    out({ output: r.output, brief: r.brief, editorialPlan: r.editorialPlan }, [
-      `Draft workspace: ${rel(r.output)}`,
-      `Brief: ${rel(path.join(path.dirname(path.resolve(file)), 'briefs', `${o.platform}.md`))}`,
-      r.brief.readiness.readyForDrafting ? 'Ready for drafting.' : 'NOT ready for drafting (see brief).',
-      r.editorialPlan.planned
-        ? `Editorial plan: ${rel(r.editorialPlan.dir)} (write from the voice plan; audit with \`editorial-kit editorial audit\`).`
-        : `No editorial plan for ${o.platform} (${rel(r.editorialPlan.dir)}/direction.json missing). For long-form prose run \`editorial-kit editorial plan --story ${rel(path.resolve(file))} --platform ${o.platform}\` first.`,
+    const r = await trendsWorkflow(c, { ...(o.platform ? { platform: o.platform } : {}), ...(o.period ? { days: o.period } : {}), limit: o.limit });
+    out(r, [
+      `${r.platform}: ${r.window.start.slice(0, 10)} → ${r.window.end.slice(0, 10)} (${r.window.days} days), ${r.runs} research run(s) in history. Shares describe the sample, not topic quality.`,
+      ...r.rows.map((x) => `${x.label.padEnd(36)} ${`${x.saturation.metrics.articleCount}/${x.saturation.metrics.sampleSize}`.padStart(7)} ${pct(x.saturation.metrics.share).padStart(4)}  ${x.saturation.state.padEnd(17)} activity ${x.activity.level.padEnd(7)} trend ${x.trend.direction}`),
+      `Report: ${rel(r.files.md)}`,
     ]);
   });
+trends
+  .command('topic <topic>')
+  .description('one topic: saturation dimensions and trend direction')
+  .option('-p, --platform <id>', 'platform id')
+  .option('--period <days>', 'analysis window, e.g. 30d', days)
+  .option('--window <days>', 'trend bucket width, e.g. 7d', days)
+  .action(topicTrendAction);
+trends
+  .command('history <topic>')
+  .description('trend history of a topic across research runs (buckets, shares, comparison window)')
+  .option('-p, --platform <id>', 'platform id')
+  .option('--window <days>', 'bucket width, e.g. 7d', days)
+  .option('--since <days>', 'look back this many days, e.g. 120d', days)
+  .addOption(new Option('--basis <basis>', 'observation basis').choices(['research-runs', 'publication-dates']))
+  .action(topicTrendAction);
 
 program
-  .command('create')
-  .description('story skeleton + evidence + brief + draft workspace for the first platform')
-  .requiredOption('-t, --topic <text>', 'topic')
-  .requiredOption('-p, --platform <id>', 'first platform')
-  .option('-P, --project <id>', 'project id')
-  .option('--slug <slug>', 'article slug')
-  .option('--type <publicationType>', 'publication type')
-  .option('--force', 'replace an existing story skeleton')
-  .action(async (o: { topic: string; platform: string; project?: string; slug?: string; type?: string; force?: boolean }) => {
+  .command('saturation')
+  .description('topic saturation with every dimension and the rule that assigned the state')
+  .option('-p, --platform <id>', 'platform id')
+  .option('-t, --topic <topic>', 'one topic (default: all topics in the window)')
+  .option('--period <days>', 'analysis window, e.g. 30d', days)
+  .action(async (o: { platform?: string; topic?: string; period?: number }) => {
     const c = await ctx();
-    const r = await createWorkflow(c, { topic: o.topic, platform: o.platform, ...(o.project ? { projectId: o.project } : {}), ...(o.slug ? { slug: o.slug } : {}), ...(o.type ? { type: o.type } : {}), ...(o.force ? { force: true } : {}) });
-    out(r, [`Story: ${rel(r.storyFile)}`, `Draft workspace: ${rel(r.output)}`, r.brief.readiness.readyForDrafting ? 'Ready for drafting.' : `NOT ready for drafting yet — complete the story from evidence:\n${r.brief.readiness.blockers.map((b) => `- ${b}`).join('\n')}`]);
+    const r = await saturationWorkflow(c, { ...(o.platform ? { platform: o.platform } : {}), ...(o.topic ? { topic: o.topic } : {}), ...(o.period ? { days: o.period } : {}) });
+    out(r, [...r.reports.map((s) => `${s.label}: ${s.state} — ${s.because.join('; ')}`), `Report: ${rel(r.files.md)}`]);
   });
 
-// ---------------------------------------------------- editorial layer (Phase 2)
-const input = program.command('input').description('author input: raw thoughts, phrases, anecdotes and jokes for an article (articles/<slug>/author-input.md)');
-input
-  .command('init')
-  .description('create author-input.md next to the story (an empty template is valid)')
-  .requiredOption('-s, --story <file>', 'path to story.json')
-  .option('--force', 'replace an existing author-input.md with an empty template')
-  .action(async (o: { story: string; force?: boolean }) => {
-    const r = await inputInitWorkflow(path.resolve(o.story), o.force ? { force: true } : {});
-    out(r, r.created ? `Author input: ${rel(r.file)} (edit it freely; no section is required).` : `Kept existing ${rel(r.file)} (use --force to replace it).`);
+program
+  .command('patterns')
+  .description('pattern report: structural/framing patterns observed in the research history (never applied automatically)')
+  .option('-p, --platform <id>', 'platform id')
+  .option('--runs <n>', 'research runs to include in the history', (v) => Number(v))
+  .action(async (o: { platform?: string; runs?: number }) => {
+    const c = await ctx();
+    const r = await patternsWorkflow(c, { ...(o.platform ? { platform: o.platform } : {}), ...(o.runs ? { runs: o.runs } : {}) });
+    out(r, [...r.items.map((p) => `${p.patternId} (${p.strength}, ${p.change}): ${p.observation}`), r.items.length ? 'Decision on every pattern: left to the author.' : 'No pattern observations yet.', `Report: ${rel(r.files.md)}`]);
   });
-input
-  .command('add')
-  .description('append one item to a section of author-input.md (the Markdown file stays the source of truth)')
-  .requiredOption('-s, --story <file>', 'path to story.json')
-  .addOption(new Option('--priority <priority>', 'section: verbatim (exact phrase), must, should, may, background, avoid (do not use)').choices(materialPrioritySchema.options).makeOptionMandatory())
-  .requiredOption('--text <text>', 'the item (quote it in the shell; multi-line text is fine)')
-  .action(async (o: { story: string; priority: MaterialPriority; text: string }) => {
-    const r = await inputAddWorkflow(path.resolve(o.story), o.priority, o.text);
-    out({ file: r.file, item: r.item }, `Added ${sectionDef(PRIORITY_TO_SECTION[o.priority]).heading} item ${r.item.id} to ${rel(r.file)}.`);
+
+// ----------------------------------------------------------------- author
+interface AuthorSyncOptions {
+  platform?: string[];
+  max: number;
+  refresh?: boolean;
+  offline?: boolean;
+}
+
+async function authorSyncAction(o: AuthorSyncOptions): Promise<void> {
+  const c = await ctx();
+  const result = await authorSync(c, { maxArticles: o.max, ...(o.platform ? { platforms: o.platform } : {}), ...(o.refresh ? { refresh: true } : {}), ...(o.offline ? { offline: true } : {}) });
+  const memory = await rebuildAuthorMemory(c);
+  out({ ...result, indexed: memory.publications.length }, [
+    `Collected ${result.collected} publication(s): ${Object.entries(result.byPlatform).map(([k, v]) => `${k}=${v}`).join(', ') || 'none'} (${result.added} new, ${result.updated} updated, ${result.unchanged} unchanged).`,
+    ...result.skipped.map((s) => `skipped ${s.platform}: ${s.reason}`),
+    ...result.failures.map((f) => `failed ${f.stage}${f.url ? ` ${f.url}` : ''}: ${f.reason}`),
+    `Archive: ${memory.publications.length} publication(s). Coverage: \`storyops author coverage\`.`,
+  ]);
+}
+
+const author = program.command('author').description('author intelligence: publication archive, coverage map, overlap');
+author
+  .command('sync')
+  .description('collect your public publications from configured profiles (live adapter: Habr)')
+  .option('-p, --platform <ids>', 'comma-separated platform ids', list)
+  .option('--max <n>', 'maximum publications per platform', (v) => Number(v), 100)
+  .option('--refresh', 'ignore fresh cache entries')
+  .option('--offline', 'use cached pages only')
+  .action(authorSyncAction);
+author
+  .command('import <file>')
+  .description('import one of YOUR published pieces from Markdown (+ frontmatter: title, platform, date, url, tags, projects, depth). Unpublished drafts are not publications.')
+  .option('-p, --platform <id>', 'platform id (telegram, linkedin, medium, generic-blog, ...)')
+  .option('--url <url>', 'public URL')
+  .option('--date <iso>', 'publication date (ISO 8601)')
+  .action(async (file: string, o: { platform?: string; url?: string; date?: string }) => {
+    const c = await ctx();
+    const { publication, added } = await importPublication(c, path.resolve(file), o);
+    await rebuildAuthorMemory(c);
+    out(publication, `${added ? 'Imported' : 'Updated'} "${publication.title}" (${publication.platform}, ${publication.depth}).`);
   });
-input
-  .command('show')
-  .description('show the parsed author input (items per priority, ids, issues)')
-  .requiredOption('-s, --story <file>', 'path to story.json')
-  .action(async (o: { story: string }) => {
-    const story = await loadStory(path.resolve(o.story));
-    const parsed = await loadAuthorInput(path.resolve(o.story), story.slug);
-    if (!parsed) return out({ items: [] }, 'No author-input.md yet (`editorial-kit input init --story …`).');
-    const by = itemsByPriority(parsed);
-    out(parsed, [
-      ...Object.entries(by).filter(([, items]) => items.length).flatMap(([p, items]) => [`${p.toUpperCase()} (${items.length})`, ...items.map((i) => `  ${i.id}  ${abbreviate(i.text, 100)}`)]),
-      ...(parsed.items.length ? [] : ['(empty)']),
-      ...parsed.issues.map((i) => `${i.severity}: ${i.line ? `line ${i.line}: ` : ''}${i.message}`),
+author
+  .command('coverage')
+  .description('coverage map: which topics you mentioned, covered, covered deeply, revisited, or covered long ago')
+  .option('--all', 'include built-in topics you never wrote about')
+  .action(async (o: { all?: boolean }) => {
+    const c = await ctx();
+    const r = await coverageWorkflow(c, o.all ? { all: true } : {});
+    out(r, ['Topic                                Coverage', '-'.repeat(60), ...r.rows.map((x) => `${x.label.padEnd(36)} ${coverageText(x)}`), '', `${r.publications} publication(s). Report: ${rel(r.files.md)}`]);
+  });
+author
+  .command('topics')
+  .description('topics you have written about (coverage level per topic)')
+  .action(async () => {
+    const c = await ctx();
+    const r = await coverageWorkflow(c);
+    const covered = r.rows.filter((x) => x.level !== 'not-covered');
+    out(covered, covered.map((x) => `${x.label.padEnd(36)} ${COVERAGE_LABEL[x.level].padEnd(18)} ${x.publications.length} publication(s), last ${x.lastCoveredAt?.slice(0, 10) ?? '—'}`));
+  });
+author
+  .command('overlap <topic>')
+  .description('duplicate-topic detection: what of this topic is already in your archive, and what is new')
+  .option('--repo <id>', 'repository id')
+  .action(async (topic: string, o: { repo?: string }) => {
+    const c = await ctx();
+    const r = await overlapWorkflow(c, topic, o.repo ? { projectId: o.repo } : {});
+    const x = r.candidate;
+    out(r, [
+      `Overlap: ${x.dimensions.authorOverlap.level} (${x.dimensions.authorOverlap.reason})`,
+      '',
+      'Already covered:',
+      ...(x.author.alreadyCovered.length ? x.author.alreadyCovered.map((a) => `- ${a}`) : ['- nothing on this topic']),
+      ...(x.author.similar.length ? ['', 'Similar publications:', ...x.author.similar.map((s) => `- "${s.title}" (cosine ${s.cosine}; ${s.sharedTerms?.slice(0, 5).join(', ')})`)] : []),
+      '',
+      'New material (repository):',
+      ...(x.author.genuinelyNew.length ? x.author.genuinelyNew.map((a) => `- ${a}`) : ['- none found']),
+      '',
+      `Interpretation: ${r.interpretation}`,
     ]);
-    if (parsed.issues.some((i) => i.severity === 'error')) process.exitCode = 1;
+  });
+author
+  .command('profile')
+  .description('rebuild the publication index, continuity map, author profile and coverage from the archive')
+  .action(async () => {
+    const c = await ctx();
+    const m = await rebuildAuthorMemory(c);
+    out(m.profile, [`Author profile: ${rel(c.workspace.authorProfileMd)}`, `Continuity: ${rel(c.workspace.continuityMd)}`, `${m.publications.length} publication(s).`]);
+  });
+author
+  .command('publications')
+  .description('list the archive')
+  .action(async () => {
+    const c = await ctx();
+    const pubs = loadPublications(await db(c));
+    await saveDb(c);
+    out(pubs.map((p) => ({ id: p.id, platform: p.platform, date: p.publicationDate, title: p.title, depth: p.depth })), pubs.map((p) => `${p.publicationDate?.slice(0, 10) ?? 'undated   '}  ${p.platform.padEnd(12)} ${p.depth?.padEnd(8) ?? '        '} ${p.title}`));
   });
 
-async function stylesCtx(): Promise<Pick<AppContext, 'workspace'>> {
+// ------------------------------------------------------------------- repo
+async function repoInspectAction(o: { repo?: string; maxCommits?: number }): Promise<void> {
+  const c = await ctx();
+  const r = await inspectRepoWorkflow(c, o.repo, o.maxCommits ? { maxCommits: o.maxCommits } : {});
+  out({ repo: r.report.projectId, events: r.events.length, topics: r.topics.length, unchanged: r.unchanged, files: r.files }, [
+    `${r.report.name}: ${r.report.commits.length} commits, ${r.report.tags.length} tags, ${r.report.modules.filter((m) => m.exists).length} modules, ${r.report.tests.files} test files.`,
+    `${r.events.length} event(s) (${r.added} new), ${r.topics.length} topic(s).${r.unchanged ? ' Repository unchanged since the last snapshot.' : ''}`,
+    ...r.report.warnings.slice(0, 5).map((w) => `warning: ${w}`),
+    `Events: ${rel(r.files.events.md)}  Topics: ${rel(r.files.topics.md)}`,
+  ]);
+}
+
+const repo = program.command('repo').description('repository intelligence (read-only): events and topic map');
+repo
+  .command('inspect')
+  .description('inspect a configured repository (history, docs, ADRs, tests) and extract engineering events and topics')
+  .option('--repo <id>', 'repository id (config "projects")')
+  .option('--max-commits <n>', 'history limit', (v) => Number(v))
+  .action(repoInspectAction);
+repo
+  .command('events')
+  .description('list candidate engineering events with evidence strength and what they were inferred from')
+  .option('--repo <id>', 'repository id')
+  .option('--since <date>', 'only events ending on/after this date (YYYY-MM-DD)')
+  .option('--type <types>', 'comma-separated event types', list)
+  .action(async (o: { repo?: string; since?: string; type?: string[] }) => {
+    const c = await ctx();
+    const r = await eventsWorkflow(c, o.repo, { ...(o.since ? { since: o.since } : {}), ...(o.type ? { types: o.type } : {}) });
+    await saveDb(c);
+    out(r, r.events.map((e) => `${eventDate(e).slice(0, 10)}  ${e.type.padEnd(22)} ${e.evidenceStrength.padEnd(8)} ${e.basis.padEnd(14)} ${e.summary}`));
+  });
+repo
+  .command('topics')
+  .description('repository topic map (events grouped by topic)')
+  .option('--repo <id>', 'repository id')
+  .action(async (o: { repo?: string }) => {
+    const c = await ctx();
+    const r = await repoTopicsWorkflow(c, o.repo);
+    await saveDb(c);
+    out(r, r.topics.map((t) => `${t.label.padEnd(32)} ${String(t.events.length).padStart(3)} event(s)  ${t.types.join(', ')}  (last ${t.lastEventAt.slice(0, 10)})`));
+  });
+
+// ----------------------------------------------------------------- topics
+const topics = program.command('topics').description('topic discovery: opportunities, dossiers, comparisons (no ranking; you choose)');
+topics
+  .command('discover')
+  .description('opportunity report: repository novelty × author coverage × platform landscape (topics/opportunities.{md,json})')
+  .option('--repo <id>', 'repository id')
+  .option('-p, --platform <id>', 'platform id for activity/saturation/trend')
+  .option('--since <date>', 'only repository events since this date (YYYY-MM-DD)')
+  .option('--limit <n>', 'maximum candidates (alphabetical)', (v) => Number(v))
+  .action(async (o: { repo?: string; platform?: string; since?: string; limit?: number }) => {
+    const c = await ctx();
+    const r = await discoverWorkflow(c, { ...(o.repo ? { repo: o.repo } : {}), ...(o.platform ? { platform: o.platform } : {}), ...(o.since ? { since: o.since } : {}), ...(o.limit ? { limit: o.limit } : {}) });
+    out(r.report, [
+      `${r.report.candidates.length} candidate(s), alphabetical. No ranking: every dimension is shown separately.`,
+      ...r.report.candidates.map((x) => `- ${x.topic.label} (\`${x.id}\`): ${dimensionSummary(x)} → ${x.quadrant}`),
+      '',
+      ...Object.entries(r.report.matrix).filter(([, v]) => v.length).map(([q, v]) => `${q}: ${v.join(', ')}`),
+      '',
+      `Report: ${rel(r.files.md)}  (details: \`storyops topics show <id>\`)`,
+    ]);
+  });
+topics
+  .command('show <id>')
+  .description('topic dossier (topics/<id>/dossier.{md,json}): evidence, coverage, platform context, risks, questions')
+  .option('--repo <id>', 'repository id')
+  .option('-p, --platform <id>', 'platform id')
+  .action(async (id: string, o: { repo?: string; platform?: string }) => {
+    const c = await ctx();
+    const r = await showWorkflow(c, id, { ...(o.repo ? { repo: o.repo } : {}), ...(o.platform ? { platform: o.platform } : {}) });
+    const x = r.dossier.candidate;
+    const d = x.dimensions;
+    out(r.dossier, [
+      `Topic: ${x.topic.label}`,
+      '',
+      `Repository novelty: ${d.repositoryNovelty.level} — ${d.repositoryNovelty.reason}`,
+      `Author overlap: ${d.authorOverlap.level} — ${d.authorOverlap.reason}`,
+      `Platform activity: ${d.platformActivity.level} — ${d.platformActivity.reason}`,
+      `Saturation: ${d.saturation.state}`,
+      `Trend: ${d.trendDirection.direction}`,
+      `Evidence strength: ${d.evidenceStrength.level}`,
+      '',
+      'Evidence:',
+      ...(x.repository?.events ?? []).slice(0, 10).map((e) => `- ${e.date.slice(0, 10)} ${e.type}: ${e.summary}`),
+      '',
+      'Already covered:',
+      ...(x.author.alreadyCovered.length ? x.author.alreadyCovered.map((a) => `- ${a}`) : ['- nothing']),
+      '',
+      'Questions:',
+      ...x.questions.map((q) => `- ${q}`),
+      '',
+      `Dossier: ${rel(r.files.md)}`,
+    ]);
+  });
+topics
+  .command('compare <topics...>')
+  .description('compare topics side by side, dimension by dimension (no winner)')
+  .option('--repo <id>', 'repository id')
+  .option('-p, --platform <id>', 'platform id')
+  .action(async (queries: string[], o: { repo?: string; platform?: string }) => {
+    const c = await ctx();
+    const r = await compareWorkflow(c, queries, { ...(o.repo ? { repo: o.repo } : {}), ...(o.platform ? { platform: o.platform } : {}) });
+    out(r, [...r.candidates.map((x) => `${(x.query ?? x.topic.label).padEnd(40)} ${dimensionSummary(x)} (${x.quadrant})`), '', `No winner is chosen. Report: ${rel(r.files.md)}`]);
+  });
+topics
+  .command('list')
+  .description('known topics (built-in taxonomy, config topics, project glossary, repository modules)')
+  .action(async () => {
+    const c = await ctx();
+    const t = await listTopicsWorkflow(c);
+    await saveDb(c);
+    out(t, t.map((x) => `${x.id.padEnd(28)} ${x.origin.padEnd(9)} ${x.specificity.padEnd(11)} ${x.label}`));
+  });
+
+// ----------------------------------------------------------------- review
+/** Review works outside a workspace too (defaults, no database). */
+async function reviewCtx(): Promise<{ ctx: AppContext; workspace: boolean }> {
   try {
-    return await ctx();
-  } catch {
-    return { workspace: resolveWorkspace(root()) };
+    return { ctx: await ctx(), workspace: true };
+  } catch (error) {
+    if (!(error instanceof StoryOpsError) || error.code !== 'CONFIG_NOT_FOUND') throw error;
+    const config = parseConfig({ author: { name: 'author' } });
+    return { ctx: { workspace: workspaceFor(root(), config, resolveConfigFile(root()).file), config, configWarnings: [], registry: createDefaultRegistry(), clock: systemClock, logger: logger() }, workspace: false };
   }
 }
 
-const styles = program.command('styles').description('article style presets (what kind of piece: engineering story, dev diary, postmortem…)');
-styles
+program
+  .command('review <article>')
+  .description('READ-ONLY review of an article YOU wrote: language, style patterns, logic, factual claims, repetition, structure, clarity, platform fit, archive overlap. Never modifies the article.')
+  .option('--repo <id>', 'compare factual claims with this repository')
+  .option('-p, --platform <id>', 'add platform context (never overrides your choices)')
+  .option('--profile <id>', 'review profile (see `storyops profiles list`)')
+  .option('--type <publicationType>', 'publication type for platform length context')
+  .option('--input <file>', 'author-input.md with MUST USE / VERBATIM / DO NOT USE notes (default: next to the article)')
+  .option('--out <dir>', 'report directory (default: reviews/<article>-<date>/)')
+  .option('--no-archive', 'do not compare with your previous publications')
+  .option('--no-db', 'do not store the review or read earlier decisions')
+  .action(async (file: string, o: { repo?: string; platform?: string; profile?: string; type?: string; input?: string; out?: string; archive: boolean; db: boolean }) => {
+    const { ctx: c, workspace } = await reviewCtx();
+    const r = await reviewWorkflow(c, file, { ...(o.repo ? { repo: o.repo } : {}), ...(o.platform ? { platform: o.platform } : {}), ...(o.profile ? { profile: o.profile } : {}), ...(o.type ? { type: o.type } : {}), ...(o.input ? { input: o.input } : {}), ...(o.out ? { out: o.out } : {}), archive: o.archive && workspace, noDb: !o.db || !workspace });
+    const s = r.report.summary;
+    out({ report: r.report, files: r.files, articleUnchanged: r.articleHashBefore === r.articleHashAfter }, [
+      `${s.total} finding(s): ${Object.entries(s.byCategory).map(([k, v]) => `${k} ${v}`).join(', ') || 'none'}.`,
+      ...r.report.findings.filter((f) => f.status === 'open').slice(0, 25).map((f) => `${f.id} ${f.lines ? `L${f.lines.start}`.padEnd(6) : '      '} ${f.category.padEnd(12)} ${f.severity.padEnd(10)} ${f.problem}`),
+      ...(s.open > 25 ? [`… ${s.open - 25} more in the report.`] : []),
+      '',
+      `Article unchanged (sha256 ${r.articleHashAfter.slice(0, 12)}…). Report: ${rel(r.files.md)}`,
+    ]);
+  });
+
+const findings = program.command('findings').description('review findings: list them and record your decisions (open, accepted, dismissed, resolved)');
+findings
   .command('list')
-  .description('list built-in and workspace (.editorial/styles/) presets')
+  .option('--review <id>', 'review id (default: the latest review)')
+  .action(async (o: { review?: string }) => {
+    const c = await ctx();
+    const database = await db(c);
+    const id = o.review ?? latestReviewId(database);
+    if (!id) throw new StoryOpsError('NO_REVIEW', 'No stored review yet.', { hint: 'Run `storyops review <article.md>` in the workspace.' });
+    const rows = listFindings(database, id);
+    out({ review: id, findings: rows }, [`Review ${id}`, ...rows.map((f) => `${f.id} ${f.lines.padEnd(10)} ${f.category.padEnd(12)} ${f.severity.padEnd(10)} ${f.status.padEnd(9)} ${f.problem}`)]);
+  });
+findings
+  .command('set <finding> <status>')
+  .description('record a decision; dismissed/accepted findings keep that status in later reviews of the same article')
+  .option('--review <id>', 'review id (default: the latest review)')
+  .option('--note <text>', 'why')
+  .action(async (finding: string, status: string, o: { review?: string; note?: string }) => {
+    const parsed = findingStatusSchema.safeParse(status);
+    if (!parsed.success) throw new StoryOpsError('BAD_STATUS', `Status must be one of: ${findingStatusSchema.options.join(', ')}`);
+    const c = await ctx();
+    const database = await db(c);
+    const id = o.review ?? latestReviewId(database);
+    if (!id) throw new StoryOpsError('NO_REVIEW', 'No stored review yet.');
+    const r = setFindingStatus(database, id, finding.toUpperCase(), parsed.data, c.clock.now().toISOString(), o.note);
+    await saveDb(c);
+    out({ review: id, finding, status: parsed.data, ...r }, `${finding} in ${id}: ${parsed.data}. Remembered for ${r.articleKey}.`);
+  });
+
+// --------------------------------------------------------------------- db
+const dbCmd = program.command('db').description('the intelligence database (.storyops/storyops.db)');
+dbCmd
+  .command('status')
+  .description('file, size, schema version and pending migrations (does not migrate)')
   .action(async () => {
-    const catalog = await loadStyles(await stylesCtx());
-    const rows = catalog.list().map((s) => ({ id: s.preset.id, version: s.preset.version, source: s.source, displayName: s.preset.displayName, suitablePublicationTypes: s.preset.suitablePublicationTypes }));
-    out({ styles: rows, issues: catalog.issues }, [...rows.map((r) => `${r.id.padEnd(24)} ${r.version.padEnd(7)} ${r.source.padEnd(9)} ${r.displayName}`), ...catalog.issues.map((i) => `${i.severity}: ${rel(i.file)}: ${i.message}`)]);
-    if (catalog.issues.some((i) => i.severity === 'error')) process.exitCode = 1;
+    const c = await ctx();
+    const s = await dbStatusWorkflow(c);
+    out(s, [
+      `${rel(s.file)}: ${s.exists ? `${s.bytes ?? '?'} bytes, schema v${s.version} of v${s.latest}` : 'not created yet'}`,
+      ...s.applied.map((a) => `  applied ${String(a.version).padStart(3, '0')}-${a.name} at ${a.appliedAt}`),
+      ...(s.pending.length ? [`  pending: ${s.pending.join(', ')} (applied automatically by the next command; a backup is written first)`] : []),
+      'Backups: `storyops db backup`, or copy the file while no StoryOps command is running.',
+    ]);
   });
-styles
-  .command('show <id>')
-  .description('print one style preset')
-  .action(async (id: string) => {
-    const style = (await loadStyles(await stylesCtx())).get(id);
-    out(style, renderStylePreset(style));
-  });
-styles
-  .command('validate')
-  .description('validate every preset (schema, id = file name, no duplicate ids)')
+dbCmd
+  .command('stats')
+  .description('row counts per table')
   .action(async () => {
-    const catalog = await loadStyles(await stylesCtx());
-    out({ valid: catalog.ids(), issues: catalog.issues }, [`${catalog.ids().length} valid style(s): ${catalog.ids().join(', ')}`, ...catalog.issues.map((i) => `${i.severity}: ${rel(i.file)}: ${i.message}`)]);
-    if (catalog.issues.some((i) => i.severity === 'error')) process.exitCode = 1;
+    const c = await ctx();
+    const s = await dbStatsWorkflow(c);
+    out(s, Object.entries(s).map(([k, v]) => `${k.padEnd(28)} ${v}`));
+  });
+dbCmd
+  .command('vacuum')
+  .description('compact the database file')
+  .action(async () => {
+    const c = await ctx();
+    const r = await dbVacuumWorkflow(c);
+    out(r, `Vacuumed: ${r.before ?? '?'} → ${r.after ?? '?'} bytes.`);
+  });
+dbCmd
+  .command('rebuild')
+  .description('recompute derived tables (topic links, trend snapshots, coverage, repository topics) from stored base data')
+  .action(async () => {
+    const c = await ctx();
+    const r = await dbRebuildWorkflow(c);
+    out(r, `Rebuilt: ${r.articleTopicLinks} article-topic links, ${r.trendSnapshots} trend snapshot(s), ${r.coverageRows} coverage rows, ${r.repositoryTopicLinks} repository-topic links.`);
+  });
+dbCmd
+  .command('backup [file]')
+  .description('copy the database file (default: .storyops/backups/storyops-<time>.db)')
+  .action(async (file?: string) => {
+    const c = await ctx();
+    const dest = await dbBackupWorkflow(c, file);
+    out({ backup: dest }, `Backup: ${rel(dest)}`);
   });
 
-const editorial = program.command('editorial').description('editorial layer between facts and prose: direction, pattern transfer, voice plan, audit');
-editorial
-  .command('plan')
-  .description('create or refresh author-input.md (if missing), editorial/direction.*, editorial/pattern-transfer.*, editorial/voice-plan.* (deterministic scaffolds; the agent fills the decisions)')
-  .requiredOption('-s, --story <file>', 'path to story.json')
-  .requiredOption('-p, --platform <id>', 'platform id')
-  .option('--style <id>', 'article style preset (see `styles list`)')
-  .option('--type <publicationType>', 'publication type (default: the brief\'s, else the platform default)')
-  .option('--reset', 'discard existing editorial decisions and start from fresh scaffolds')
-  .action(async (o: { story: string; platform: string; style?: string; type?: string; reset?: boolean }) => {
-    const c = await ctx();
-    const r = await editorialPlanWorkflow(c, path.resolve(o.story), o.platform, { ...(o.style ? { style: o.style } : {}), ...(o.type ? { type: o.type } : {}), ...(o.reset ? { reset: true } : {}) });
-    const d = r.plan.direction;
-    out(
-      { files: r.files, reviewRequired: r.reviewRequired, style: d.style, publicationType: d.publicationType, patterns: r.plan.patternTransfer.items.length, authorInput: r.authorInputFile },
-      [
-        `${r.authorInputCreated ? 'Created' : 'Author input'}: ${rel(r.authorInputFile)}`,
-        `Editorial plan (${r.refreshed ? 'refreshed' : 'created'}): ${rel(r.files.dir)}/{direction,pattern-transfer,voice-plan}.{json,md}`,
-        d.style.id ? `Style: ${d.style.id}@${d.style.version} (${d.style.chosenBy ?? '?'}); publication type: ${d.publicationType}` : `Style: NOT SELECTED. Candidates for ${d.publicationType}: ${d.style.candidates.map((x) => x.id).join(', ')}`,
-        `Pattern transfer: ${r.plan.patternTransfer.items.length} observation(s) from ${r.plan.patternTransfer.basedOn.research?.file ?? 'no research snapshot'}; ${r.plan.patternTransfer.items.filter((i) => i.decision === 'pending').length} pending.`,
-        ...r.reviewRequired.map((m) => `REVIEW REQUIRED: ${m}`),
-        'Next: fill the TODO decisions (editorial-author skill), then `editorial-kit editorial validate`.',
-      ],
-    );
-  });
-editorial
-  .command('validate')
-  .description('is the editorial plan complete, consistent and current? (style, decisions, drift, provenance, story/evidence)')
-  .requiredOption('-s, --story <file>', 'path to story.json')
-  .requiredOption('-p, --platform <id>', 'platform id')
-  .action(async (o: { story: string; platform: string }) => {
-    const c = await ctx();
-    const r = await editorialValidateWorkflow(c, path.resolve(o.story), o.platform);
-    out(r, [r.ready ? 'Editorial plan is ready for drafting.' : 'Editorial plan is NOT ready for drafting.', ...r.issues.map((i) => `${i.severity}: [${i.artifact}] ${i.message}`)]);
-    if (!r.ready) process.exitCode = 1;
-  });
-editorial
-  .command('audit')
-  .description('post-draft audit: author material (VERBATIM exact, MUST/SHOULD mapping), DO NOT USE, pattern usage, voice/dryness and style warnings')
-  .requiredOption('-s, --story <file>', 'path to story.json')
-  .requiredOption('-p, --platform <id>', 'platform id')
-  .option('-o, --output <file>', 'draft to audit (default: articles/<slug>/outputs/<platform>.md)')
-  .action(async (o: { story: string; platform: string; output?: string }) => {
-    const c = await ctx();
-    const r = await editorialAuditWorkflow(c, path.resolve(o.story), o.platform, o.output);
-    const s = r.audit.summary;
-    out(r.audit, [
-      `VERBATIM   ${s.verbatim.incorporated}/${s.verbatim.total} incorporated exactly`,
-      `MUST       ${s.must.incorporated}/${s.must.total} incorporated${s.must.omitted ? `, ${s.must.omitted} omitted` : ''}${s.must.unmapped ? `, ${s.must.unmapped} unmapped` : ''}`,
-      `SHOULD     ${s.should.incorporated}/${s.should.total} incorporated${s.should.omitted ? `, ${s.should.omitted} omitted` : ''}${s.should.unmapped ? `, ${s.should.unmapped} unmapped` : ''}`,
-      `MAY        ${s.may.used} used, ${s.may.unused} unused`,
-      `DO NOT USE ${s.avoid.violations ? `${s.avoid.violations} violation(s)` : 'no direct violations detected'}`,
-      `PATTERNS   ${s.patterns.incorporated}/${s.patterns.expected} mapped${s.patterns.overridden ? `, ${s.patterns.overridden} overridden by author` : ''}`,
-      ...r.audit.issues.filter((i) => i.severity !== 'info').map((i) => `${i.severity}: [${i.area}] ${i.message}`),
-      `Audit: ${rel(r.files.audit.md)} (${s.errors} error(s), ${s.warnings} warning(s))`,
-    ]);
-    if (s.errors > 0) process.exitCode = 1;
-  });
-
-// ------------------------------------------------------------ screenshots
-const shots = program.command('screenshots').description('screenshot planning and Playwright capture');
-shots
-  .command('plan')
-  .description('derive a screenshot plan (with narrative purpose per shot) from the story')
-  .requiredOption('-s, --story <file>', 'path to story.json')
-  .option('--base-url <url>', 'application base URL', 'http://localhost:3000')
-  .action(async (o: { story: string; baseUrl: string }) => {
-    const c = await ctx();
-    const { plan, files } = await screenshotPlanWorkflow(c, path.resolve(o.story), o.baseUrl);
-    out(plan, [`Plan: ${rel(files.json)} (${plan.steps.length} step(s)); fill in paths and ready selectors, then run \`editorial-kit screenshots capture --plan ${rel(files.json)}\`.`]);
-  });
-shots
-  .command('capture')
-  .description('capture screenshots from a plan into images/originals/ (never overwrites originals without --replace)')
-  .requiredOption('--plan <file>', 'screenshot plan JSON')
-  .option('--out <dir>', 'images directory (default: next to the plan inside an article, else config screenshots.outputDir)')
-  .option('--replace', 'archive existing originals to originals/.history/ and recapture')
-  .option('--only <names>', 'comma-separated step names', list)
-  .action(async (o: { plan: string; out?: string; replace?: boolean; only?: string[] }) => {
-    const c = await ctx();
-    const r = await screenshotCaptureWorkflow(c, path.resolve(o.plan), { ...(o.out ? { out: o.out } : {}), ...(o.replace ? { replace: true } : {}), ...(o.only ? { only: o.only } : {}) });
-    out(r, [
-      ...r.captured.map((x) => `captured ${x.step} → ${rel(x.file)}`),
-      ...r.skipped.map((x) => `skipped ${x.step}: ${x.reason}`),
-      ...r.failed.map((x) => `FAILED ${x.step}: ${x.reason}`),
-      ...(r.captured.length
-        ? ['', 'Visual review REQUIRED: the privacy scan reads DOM text and form values only, not pixels (images, canvas, video, CSS backgrounds, iframes).', 'Look at every image, then set "visualReview": "passed" in images/manifest.json.']
-        : []),
-    ]);
-    if (r.failed.length) process.exitCode = 1;
-  });
-
-// ---------------------------------------------------------------- misc
-const platforms = program.command('platforms').description('platform strategies');
+// ------------------------------------------------------ platforms/profiles
+const platforms = program.command('platforms').description('platform strategies (analysis context and review fit)');
 platforms
   .command('list')
-  .description('list registered platforms and what is implemented for each')
+  .description('registered platforms and what is available for each')
   .action(() => {
-    const registry = createDefaultRegistry();
-    const rows = registry.list().map((m) => ({ id: m.strategy.id, name: m.strategy.displayName, strategy: m.strategy.version, liveResearch: m.strategy.research.liveResearch, authorHistory: m.strategy.research.authorHistory, renderer: m.renderer ? 'custom' : 'default' }));
-    out(rows, rows.map((r) => `${r.id.padEnd(13)} strategy ${r.strategy}  live research: ${r.liveResearch.padEnd(14)} author history: ${r.authorHistory.padEnd(14)} renderer: ${r.renderer}`));
+    const rows = createDefaultRegistry().list().map((m) => ({ id: m.strategy.id, name: m.strategy.displayName, strategy: m.strategy.version, liveResearch: m.strategy.research.liveResearch, authorHistory: m.strategy.research.authorHistory, import: m.strategy.research.importSupported }));
+    out(rows, rows.map((r) => `${r.id.padEnd(13)} strategy ${r.strategy}  live research: ${r.liveResearch.padEnd(14)} author history: ${r.authorHistory.padEnd(14)} import: ${r.import ? 'yes' : 'no'}`));
   });
 platforms
   .command('show <id>')
@@ -522,36 +628,58 @@ platforms
     out(s, JSON.stringify(s, null, 2));
   });
 
-program
-  .command('style')
-  .description('style review against the author style profile (reports; never rewrites)')
-  .argument('<file>', 'Markdown file')
-  .option('--profile <id>', 'style profile (ru-technical, en-technical)', 'ru-technical')
-  .action(async (file: string, o: { profile: string }) => {
-    const report = checkStyle(await readFile(path.resolve(file), 'utf8'), o.profile);
-    out(report, [`${report.words} words; em dashes ${report.metrics.emDashPer1000}/1000; "не X, а Y" ${report.metrics.notXButYPer1000}/1000`, ...report.findings.map((f) => `${f.severity}: [${f.rule}]${f.line ? ` line ${f.line}` : ''} ${f.message}${f.excerpt ? ` («${f.excerpt}»)` : ''}`)]);
-    if (report.findings.some((f) => f.severity === 'error')) process.exitCode = 1;
+async function workspaceOrDefault() {
+  try {
+    return (await ctx()).workspace;
+  } catch {
+    return resolveWorkspace(root());
+  }
+}
+
+async function profileCatalog() {
+  return loadProfileCatalog({ workspaceDir: (await workspaceOrDefault()).reviewProfilesDir });
+}
+
+const profiles = program.command('profiles').description('review profiles (what a reviewer expects from an engineering story, postmortem, tutorial…)');
+profiles
+  .command('list')
+  .action(async () => {
+    const catalog = await profileCatalog();
+    out({ profiles: catalog.list().map((p) => ({ id: p.profile.id, version: p.profile.version, source: p.source })), issues: catalog.issues }, [...catalog.list().map((p) => `${p.profile.id.padEnd(24)} ${p.profile.version.padEnd(8)} ${p.source.padEnd(9)} ${p.profile.displayName}`), ...catalog.issues.map((i) => `${i.severity}: ${rel(i.file)}: ${i.message}`)]);
+    if (catalog.issues.some((i) => i.severity === 'error')) process.exitCode = 1;
+  });
+profiles
+  .command('show <id>')
+  .action(async (id: string) => {
+    const p = (await profileCatalog()).get(id);
+    out(p, renderProfile(p));
+  });
+profiles
+  .command('validate')
+  .action(async () => {
+    const catalog = await profileCatalog();
+    out({ valid: catalog.ids(), issues: catalog.issues }, [`${catalog.ids().length} valid profile(s): ${catalog.ids().join(', ')}`, ...catalog.issues.map((i) => `${i.severity}: ${rel(i.file)}: ${i.message}`)]);
+    if (catalog.issues.some((i) => i.severity === 'error')) process.exitCode = 1;
   });
 
+// ------------------------------------------------------------------ misc
 const cache = program.command('cache').description('inspect or clear the research HTTP cache');
 cache
   .command('list')
   .option('-p, --platform <id>')
   .action(async (o: { platform?: string }) => {
-    const ws = resolveWorkspace(root());
-    const rows = await new HttpCache(ws.cacheDir, 0).list(o.platform);
+    const rows = await new HttpCache((await workspaceOrDefault()).cacheDir, 0).list(o.platform);
     out(rows, rows.length ? rows.map((r) => `${r.fetchedAt}  ${r.platform.padEnd(8)} ${r.status}  ${r.url}`) : 'cache is empty');
   });
 cache
   .command('clear')
   .option('-p, --platform <id>')
   .action(async (o: { platform?: string }) => {
-    const ws = resolveWorkspace(root());
-    await new HttpCache(ws.cacheDir, 0).clear(o.platform);
+    await new HttpCache((await workspaceOrDefault()).cacheDir, 0).clear(o.platform);
     out({ cleared: o.platform ?? 'all' }, `Cleared ${o.platform ?? 'all'} cache entries.`);
   });
 
-const skills = program.command('skills').description('bundled Agent Skills');
+const skills = program.command('skills').description('bundled Agent Skills (storyops-research, storyops-opportunity, storyops-review, product-screenshots)');
 skills
   .command('validate [dir]')
   .description('validate skills against the Agent Skills specification')
@@ -580,18 +708,145 @@ skills
     out(r, [`Target: ${r.target}`, ...r.installed.map((s) => `installed ${s}`), ...r.skipped.map((s) => `skipped ${s.skill}: ${s.reason}`)]);
   });
 
+const shots = program.command('screenshots').description('optional utility: capture product screenshots from a plan you wrote (Playwright)');
+shots
+  .command('capture')
+  .description('capture screenshots from a plan into images/originals/ (never overwrites originals without --replace)')
+  .requiredOption('--plan <file>', 'screenshot plan JSON (see examples/screenshot-plan.example.json)')
+  .option('--out <dir>', 'images directory')
+  .option('--replace', 'archive existing originals to originals/.history/ and recapture')
+  .option('--only <names>', 'comma-separated step names', list)
+  .action(async (o: { plan: string; out?: string; replace?: boolean; only?: string[] }) => {
+    const c = await ctx();
+    const r = await screenshotCaptureWorkflow(c, path.resolve(o.plan), { ...(o.out ? { out: o.out } : {}), ...(o.replace ? { replace: true } : {}), ...(o.only ? { only: o.only } : {}) });
+    out(r, [
+      ...r.captured.map((x) => `captured ${x.step} → ${rel(x.file)}`),
+      ...r.skipped.map((x) => `skipped ${x.step}: ${x.reason}`),
+      ...r.failed.map((x) => `FAILED ${x.step}: ${x.reason}`),
+      ...(r.captured.length ? ['', 'Visual review REQUIRED: the privacy scan reads DOM text and form values only, not pixels.', 'Look at every image, then set "visualReview": "passed" in images/manifest.json.'] : []),
+    ]);
+    if (r.failed.length) process.exitCode = 1;
+  });
+shots
+  .command('plan')
+  .description('(removed) plans were derived from canonical stories, which StoryOps no longer creates')
+  .allowUnknownOption()
+  .allowExcessArguments()
+  .action(() => tombstone('screenshots plan', 'Write the plan yourself (examples/screenshot-plan.example.json) and run `storyops screenshots capture --plan <file>`.'));
+
 program
   .command('demo')
-  .description('run the offline, deterministic fixture scenario end to end, including the editorial layer (no network, fixed clock)')
-  .option('--out <dir>', 'output directory (must be empty or a previous demo run)', 'editorial-demo')
+  .description('offline intelligence demo: fixture platform history + author archive + repository → opportunities → human-written fixture article → review. No article is generated.')
+  .option('--out <dir>', 'output directory (must be empty or a previous demo run)', 'storyops-demo')
   .action(async (o: { out: string }) => {
     const r = await runDemo(path.resolve(o.out), { logger: logger() });
-    const e = await runEditorialDemo(r.root, { logger: logger() });
-    out({ ...r.summary, editorial: e.summary }, [await readFile(r.summaryFile, 'utf8'), `Workspace: ${rel(r.root)}`]);
+    out(r.summary, [await readFile(r.summaryFile, 'utf8'), `Workspace: ${rel(r.root)}`]);
   });
 
+// ------------------------------------------------- v2 aliases (deprecated)
+program
+  .command('project', { hidden: true })
+  .description('(deprecated) use `storyops repo`')
+  .command('inspect')
+  .option('-P, --project <id>', 'project id')
+  .option('--max-commits <n>', 'history limit', (v) => Number(v))
+  .action(async (o: { project?: string; maxCommits?: number }) => {
+    deprecated('`project inspect` → use `storyops repo inspect`.');
+    await repoInspectAction({ ...(o.project ? { repo: o.project } : {}), ...(o.maxCommits ? { maxCommits: o.maxCommits } : {}) });
+  });
+program
+  .command('gap', { hidden: true })
+  .alias('narrative-gap')
+  .description('(deprecated) use `storyops topics discover`')
+  .option('-P, --project <id>', 'project id')
+  .option('--no-reinspect', 'ignored')
+  .action(async (o: { project?: string }) => {
+    deprecated('`gap` (narrative gap) → use `storyops topics discover`; the narrative gap became repository novelty vs. author coverage.');
+    const c = await ctx();
+    const r = await discoverWorkflow(c, o.project ? { repo: o.project } : {});
+    out(r.report, [...r.report.candidates.map((x) => `- ${x.topic.label}: ${dimensionSummary(x)}`), `Report: ${rel(r.files.md)}`]);
+  });
+program
+  .command('collision', { hidden: true })
+  .description('(deprecated) use `storyops author overlap` / `storyops topics compare`')
+  .requiredOption('-t, --topic <text>', 'proposed topic')
+  .option('-P, --project <id>', 'project id')
+  .option('--description <text>', 'ignored')
+  .action(async (o: { topic: string; project?: string }) => {
+    deprecated('`collision` → use `storyops author overlap "<topic>"` or `storyops topics compare`.');
+    const c = await ctx();
+    const r = await overlapWorkflow(c, o.topic, o.project ? { projectId: o.project } : {});
+    out(r, [`Overlap: ${r.candidate.dimensions.authorOverlap.level} — ${r.candidate.dimensions.authorOverlap.reason}`, `Interpretation: ${r.interpretation}`]);
+  });
+program
+  .command('continuity', { hidden: true })
+  .description('(deprecated) use `storyops author coverage`')
+  .action(async () => {
+    deprecated('`continuity` → use `storyops author coverage` (the continuity map is still written to .storyops/author/continuity.md).');
+    const c = await ctx();
+    const m = await rebuildAuthorMemory(c);
+    out(m.continuity, `Continuity map: ${rel(c.workspace.continuityMd)} (${m.publications.length} publication(s)).`);
+  });
+program
+  .command('publications', { hidden: true })
+  .description('(deprecated) use `storyops author publications`')
+  .action(async () => {
+    deprecated('`publications` → use `storyops author publications`.');
+    const c = await ctx();
+    const pubs = loadPublications(await db(c));
+    out(pubs.map((p) => ({ id: p.id, title: p.title })), pubs.map((p) => `${p.publicationDate?.slice(0, 10) ?? 'undated'}  ${p.platform}  ${p.title}`));
+  });
+program
+  .command('style', { hidden: true })
+  .description('(deprecated) use `storyops review`')
+  .argument('<file>')
+  .allowUnknownOption()
+  .action(async (file: string) => {
+    deprecated('`style` → use `storyops review <file>` (language and style findings are part of the review).');
+    const { ctx: c } = await reviewCtx();
+    const r = await reviewWorkflow(c, file, { noDb: true, archive: false });
+    out(r.report, [`${r.report.summary.total} finding(s). Report: ${rel(r.files.md)}`]);
+  });
+program
+  .command('styles', { hidden: true })
+  .description('(deprecated) use `storyops profiles`')
+  .allowUnknownOption()
+  .allowExcessArguments()
+  .argument('[args...]')
+  .action(async () => {
+    deprecated('`styles` (style presets) → use `storyops profiles`; presets became review profiles.');
+    const catalog = await profileCatalog();
+    out(catalog.ids(), catalog.ids());
+  });
+
+// ------------------------------------------ removed generation commands
+function tombstone(command: string, instead: string): never {
+  process.stderr.write(`\`${command}\` is deprecated and was removed: StoryOps no longer generates publication drafts.\n${instead}\n`);
+  process.exit(2);
+}
+
+const REMOVED: Array<[string, string]> = [
+  ['repurpose', 'StoryOps analyses; you write. Review your own text with `storyops review <article.md> --platform <id>`.'],
+  ['create', 'Start from `storyops topics discover` and `storyops topics show <id>`; then write the article yourself.'],
+  ['story', 'Canonical stories were drafting sources. Use `storyops topics show <id>` for a topic dossier (evidence, coverage, questions).'],
+  ['brief', 'Briefs planned generated drafts. Use `storyops topics show <id>` (dossier) instead.'],
+  ['evidence', 'Use `storyops review <article.md> --repo <id>` to check your claims against repository evidence.'],
+  ['editorial', 'Editorial plans, voice plans and pattern transfer were removed. Use `storyops patterns` (pattern report) and `storyops review`.'],
+  ['input', 'Write author-input.md yourself; `storyops review` reads it (MUST USE / VERBATIM / DO NOT USE checks).'],
+];
+for (const [name, instead] of REMOVED) {
+  program
+    .command(name, { hidden: true })
+    .allowUnknownOption()
+    .allowExcessArguments()
+    .argument('[args...]')
+    .action(() => tombstone(name, instead));
+}
+
+if (invokedAs === 'editorial-kit') deprecated('the `editorial-kit` executable is deprecated; use `storyops`.');
+
 program.parseAsync(process.argv).catch((error: unknown) => {
-  if (error instanceof EditorialError) {
+  if (error instanceof StoryOpsError) {
     process.stderr.write(`error: ${error.message}\n${error.hint ? `hint: ${error.hint}\n` : ''}`);
   } else {
     process.stderr.write(`error: ${errorMessage(error)}\n`);

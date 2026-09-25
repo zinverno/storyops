@@ -3,7 +3,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { readFile, rename } from 'node:fs/promises';
 import type { Browser, BrowserContext, ElectronApplication, Page } from 'playwright';
 import type { Clock } from '../shared/clock.js';
-import { EditorialError, errorMessage } from '../shared/errors.js';
+import { StoryOpsError, errorMessage } from '../shared/errors.js';
 import { ensureDir, pathExists, readJsonIfExists, writeJson } from '../shared/fs.js';
 import { sha256 } from '../shared/hash.js';
 import type { Logger } from '../shared/logger.js';
@@ -47,8 +47,8 @@ async function webTarget(plan: ScreenshotPlan, options: CaptureOptions): Promise
   try {
     browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
   } catch (error) {
-    throw new EditorialError('BROWSER_LAUNCH', `Could not launch Chromium: ${errorMessage(error).split('\n')[0]}`, {
-      hint: 'Run `npx playwright install chromium`, or set EDITORIAL_CHROMIUM_PATH / screenshots.browserExecutablePath to an installed Chromium.',
+    throw new StoryOpsError('BROWSER_LAUNCH', `Could not launch Chromium: ${errorMessage(error).split('\n')[0]}`, {
+      hint: 'Run `npx playwright install chromium`, or set STORYOPS_CHROMIUM_PATH / screenshots.browserExecutablePath to an installed Chromium.',
     });
   }
   const context: BrowserContext = await browser.newContext({
@@ -72,7 +72,7 @@ async function electronTarget(plan: Extract<ScreenshotPlan['target'], { kind: 'e
   try {
     app = await _electron.launch({ args: plan.args, ...(plan.executablePath ? { executablePath: path.resolve(planDir, plan.executablePath) } : {}), ...(plan.cwd ? { cwd: path.resolve(planDir, plan.cwd) } : {}) });
   } catch (error) {
-    throw new EditorialError('ELECTRON_LAUNCH', `Could not launch Electron app: ${errorMessage(error).split('\n')[0]}`, { hint: 'Electron capture is experimental; check executablePath/args in the plan.' });
+    throw new StoryOpsError('ELECTRON_LAUNCH', `Could not launch Electron app: ${errorMessage(error).split('\n')[0]}`, { hint: 'Electron capture is experimental; check executablePath/args in the plan.' });
   }
   const page = await app.firstWindow();
   return { kind: 'electron', page: async () => page, version: () => undefined, close: async () => app.close() };
@@ -105,7 +105,7 @@ async function startApp(launch: NonNullable<ScreenshotPlan['launch']>, planDir: 
     spawnError = error;
   });
   await new Promise((resolve) => setImmediate(resolve));
-  const failed = () => (spawnError ? new EditorialError('APP_LAUNCH', `Could not start ${describeLaunch(launch)}: ${(spawnError as NodeJS.ErrnoException).code ?? 'spawn error'}`) : undefined);
+  const failed = () => (spawnError ? new StoryOpsError('APP_LAUNCH', `Could not start ${describeLaunch(launch)}: ${(spawnError as NodeJS.ErrnoException).code ?? 'spawn error'}`) : undefined);
   const early = failed();
   if (early) throw early;
   if (launch.readyUrl) {
@@ -113,7 +113,7 @@ async function startApp(launch: NonNullable<ScreenshotPlan['launch']>, planDir: 
     for (;;) {
       const launchError = failed();
       if (launchError) throw launchError;
-      if (child.exitCode !== null) throw new EditorialError('APP_EXITED', `Application exited with code ${child.exitCode} before becoming ready`);
+      if (child.exitCode !== null) throw new StoryOpsError('APP_EXITED', `Application exited with code ${child.exitCode} before becoming ready`);
       try {
         const res = await fetch(launch.readyUrl, { signal: AbortSignal.timeout(2000) });
         if (res.ok) break;
@@ -122,7 +122,7 @@ async function startApp(launch: NonNullable<ScreenshotPlan['launch']>, planDir: 
       }
       if (Date.now() > deadline) {
         stopApp(child);
-        throw new EditorialError('APP_NOT_READY', `Application did not become ready at ${sanitizeUrl(launch.readyUrl)} within ${launch.readyTimeoutMs}ms`);
+        throw new StoryOpsError('APP_NOT_READY', `Application did not become ready at ${sanitizeUrl(launch.readyUrl)} within ${launch.readyTimeoutMs}ms`);
       }
       await new Promise((r) => setTimeout(r, 500));
     }
@@ -143,7 +143,7 @@ function stopApp(child: ChildProcess): void {
 
 async function runStep(page: Page, plan: ScreenshotPlan, step: ScreenshotStep, timeout: number): Promise<void> {
   if (plan.target.kind === 'web') {
-    if (!plan.baseUrl) throw new EditorialError('PLAN_BASE_URL', 'Web screenshot plans need a baseUrl');
+    if (!plan.baseUrl) throw new StoryOpsError('PLAN_BASE_URL', 'Web screenshot plans need a baseUrl');
     const url = new URL(step.path ?? '/', plan.baseUrl).toString();
     await page.goto(url, { waitUntil: step.waitForNetworkIdle ? 'networkidle' : 'load', timeout });
   }
@@ -218,7 +218,7 @@ export async function captureScreenshots(options: CaptureOptions): Promise<Captu
           if (scan.findings.length > 0 || scan.filledPasswordFields > 0) {
             const kinds = [...new Set(scan.findings.map((f) => f.patternId))];
             if (scan.filledPasswordFields) kinds.push('filled-password-field');
-            throw new EditorialError('PRIVACY_BLOCKED', `Privacy check failed: visible ${kinds.join(', ')}. Mask or hide the region (privacy.mask / step.mask) or use demo data.`);
+            throw new StoryOpsError('PRIVACY_BLOCKED', `Privacy check failed: visible ${kinds.join(', ')}. Mask or hide the region (privacy.mask / step.mask) or use demo data.`);
           }
         }
         const tmp = `${outFile}.tmp-${process.pid}.png`;
