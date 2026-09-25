@@ -1,0 +1,27 @@
+# Built-in review profile. StoryOps uses it to REVIEW a human-written draft;
+# it never generates prose in this style. Copy to .storyops/review-profiles/<new-id>.yaml
+# (with a new id) to customise; no code changes are needed.
+schemaVersion: 2
+id: postmortem
+version: 2.0.0
+displayName: Postmortem
+description: >-
+  What went wrong, how it was noticed, why it happened and what changed so it does not happen again. Blameless, precise about timeline and impact, honest about what is still unknown.
+expectations:
+  firstPerson: expected
+  flow: incident-timeline
+  conflictEarly: true
+  technicalDepth: high
+  codeRole: supporting
+  limitations: expected
+  documentationRisk: warn
+watchFor:
+  - "Blame."
+  - "\"Production broke\" or \"users complained\" without evidence the author supplied."
+  - "Heroic narrative."
+publicationTypes:
+  - postmortem
+  - engineering-story
+  - release-retrospective
+notes:
+  - Expectations are review context. A finding based on them is a suggestion; the author decides.

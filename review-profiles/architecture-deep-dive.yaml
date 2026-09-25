@@ -1,0 +1,30 @@
+# Built-in review profile. StoryOps uses it to REVIEW a human-written draft;
+# it never generates prose in this style. Copy to .storyops/review-profiles/<new-id>.yaml
+# (with a new id) to customise; no code changes are needed.
+schemaVersion: 2
+id: architecture-deep-dive
+version: 2.0.0
+displayName: Architecture deep dive
+description: >-
+  Architecture-first explanation of a system: its model, contracts and trade-offs. Higher technical density, more diagrams, less personal narrative. Still explains architecture through the problems it solves.
+expectations:
+  firstPerson: optional
+  flow: architecture-first
+  conflictEarly: false
+  technicalDepth: very-high
+  codeRole: supporting
+  limitations: optional
+  documentationRisk: warn
+watchFor:
+  - "Personal anecdotes that do not explain a decision."
+  - "Listing modules without the constraint that justifies them."
+  - "Diagrams that restate the text without adding structure."
+  - "Performance claims without measurements."
+publicationTypes:
+  - architecture-deep-dive
+  - engineering-story
+  - migration-story
+  - refactor-story
+  - tutorial
+notes:
+  - Expectations are review context. A finding based on them is a suggestion; the author decides.

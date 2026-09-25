@@ -1,11 +1,11 @@
 import { rawTokens } from '../shared/text.js';
 
 /**
- * Deterministic originality guard. Research snapshots never store article
- * bodies; the only external text StoryOps holds is article titles (kept as
- * provenance). This finds long word sequences shared with those titles, which
- * catches copied titles and light noun-swapped variants of long titles.
- * It cannot prove originality; semantic imitation stays an editorial review item.
+ * Deterministic originality check used by platform-fit review. The database
+ * never stores other authors' article bodies; the only external text StoryOps
+ * holds is article titles (kept as provenance). This finds long word
+ * sequences an article shares with those titles. It cannot prove
+ * originality; semantic imitation is left to the human or agent reviewer.
  */
 
 export interface ExternalText {

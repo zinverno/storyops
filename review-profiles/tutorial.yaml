@@ -1,0 +1,26 @@
+# Built-in review profile. StoryOps uses it to REVIEW a human-written draft;
+# it never generates prose in this style. Copy to .storyops/review-profiles/<new-id>.yaml
+# (with a new id) to customise; no code changes are needed.
+schemaVersion: 2
+id: tutorial
+version: 2.0.0
+displayName: Tutorial
+description: >-
+  Teaches the reader to do something concrete with verified, runnable steps. The author's project is the example, not the subject.
+expectations:
+  firstPerson: optional
+  flow: step-by-step
+  conflictEarly: false
+  technicalDepth: high
+  codeRole: central
+  limitations: optional
+  documentationRisk: ignore
+watchFor:
+  - "Untested snippets."
+  - "Long backstory before the first step."
+  - "Steps that skip required setup."
+publicationTypes:
+  - tutorial
+  - technical-mini-post
+notes:
+  - Expectations are review context. A finding based on them is a suggestion; the author decides.

@@ -1,14 +1,14 @@
 import YAML from 'yaml';
 import { z } from 'zod';
-import { EditorialError } from '../shared/errors.js';
+import { StoryOpsError } from '../shared/errors.js';
 import { hashText, shortHash } from '../shared/hash.js';
 
 /**
- * Author input: raw, informal material the author wants in (or out of) the
- * article. `author-input.md` is the canonical, human-edited representation;
- * the structure below is always derived from it and never stored as the
- * source of truth. Author input is editorial source material, not factual
- * evidence: a fact only enters the article through the canonical story.
+ * Author input (`author-input.md`): the author's own notes about an article
+ * they are writing: points they want covered (MUST USE), exact phrases
+ * (VERBATIM), phrases they never want (DO NOT USE), background and questions.
+ * StoryOps never writes this file and never uses it to generate text; review
+ * only reports "MUST USE item may be missing" or "DO NOT USE phrase appears".
  */
 
 export const AUTHOR_INPUT_SCHEMA_VERSION = 1;
@@ -37,16 +37,16 @@ interface SectionDef {
 }
 
 export const INPUT_SECTIONS: readonly SectionDef[] = [
-  { id: 'verbatim', heading: 'VERBATIM', aliases: ['EXACT', 'EXACT PHRASES'], priority: 'verbatim', description: 'Exact phrases that must appear exactly as written (surrounding quotes are delimiters and are not part of the phrase). The audit checks them character by character; only whitespace is normalised.' },
-  { id: 'must', heading: 'MUST USE', aliases: ['MUST'], priority: 'must', description: 'Ideas, episodes or points that must appear in the article. Wording may change.' },
-  { id: 'should', heading: 'SHOULD USE', aliases: ['SHOULD'], priority: 'should', description: 'Material that should normally appear unless there is a strong editorial reason not to.' },
-  { id: 'may', heading: 'MAY USE', aliases: ['MAY', 'OPTIONAL'], priority: 'may', description: 'Optional ideas, jokes, examples or side notes.' },
-  { id: 'background', heading: 'BACKGROUND ONLY', aliases: ['BACKGROUND'], priority: 'background', description: 'Context for the agent. Not published unless promoted to another section.' },
-  { id: 'avoid', heading: 'DO NOT USE', aliases: ['AVOID', 'DONT USE', 'DO NOT'], priority: 'avoid', description: 'Things that must not appear in the article. Quoted fragments ("..." or «...») are checked literally.' },
-  { id: 'raw-notes', heading: 'RAW NOTES', aliases: ['NOTES', 'RAW'], priority: 'unclassified', description: 'Unstructured thoughts. The editorial pass decides what to do with them.' },
-  { id: 'personal-context', heading: 'PERSONAL CONTEXT', aliases: ['PERSONAL'], priority: 'may', description: 'Motives, experiences or reactions that cannot be inferred from Git. The only legitimate source of first-person experiences in the article.' },
-  { id: 'humor', heading: 'POSSIBLE HUMOR', aliases: ['HUMOR', 'HUMOUR', 'POSSIBLE HUMOUR', 'JOKES'], priority: 'may', description: 'Optional jokes or humorous observations.' },
-  { id: 'questions', heading: 'QUESTIONS / UNCERTAINTIES', aliases: ['QUESTIONS', 'UNCERTAINTIES'], priority: 'question', description: 'Things the author is unsure about. Never published as statements.' },
+  { id: 'verbatim', heading: 'VERBATIM', aliases: ['EXACT', 'EXACT PHRASES'], priority: 'verbatim', description: 'Exact phrases the author wants in the article (surrounding quotes are delimiters). Review reports a phrase that is missing; only whitespace is normalised.' },
+  { id: 'must', heading: 'MUST USE', aliases: ['MUST'], priority: 'must', description: 'Points the author wants covered. Review reports an item whose key words do not appear (a lexical check; paraphrases are not detected).' },
+  { id: 'should', heading: 'SHOULD USE', aliases: ['SHOULD'], priority: 'should', description: 'Points the author would like covered. Informational only.' },
+  { id: 'may', heading: 'MAY USE', aliases: ['MAY', 'OPTIONAL'], priority: 'may', description: 'Optional ideas. Not checked.' },
+  { id: 'background', heading: 'BACKGROUND ONLY', aliases: ['BACKGROUND'], priority: 'background', description: 'Background context. Not checked.' },
+  { id: 'avoid', heading: 'DO NOT USE', aliases: ['AVOID', 'DONT USE', 'DO NOT'], priority: 'avoid', description: 'Phrases the author never wants in the article. Quoted fragments ("..." or «...») are checked literally; review reports each occurrence.' },
+  { id: 'raw-notes', heading: 'RAW NOTES', aliases: ['NOTES', 'RAW'], priority: 'unclassified', description: 'Unstructured notes. Not checked.' },
+  { id: 'personal-context', heading: 'PERSONAL CONTEXT', aliases: ['PERSONAL'], priority: 'may', description: 'Personal facts and background the author may refer to. Not checked.' },
+  { id: 'humor', heading: 'POSSIBLE HUMOR', aliases: ['HUMOR', 'HUMOUR', 'POSSIBLE HUMOUR', 'JOKES'], priority: 'may', description: 'Optional jokes. Not checked.' },
+  { id: 'questions', heading: 'QUESTIONS / UNCERTAINTIES', aliases: ['QUESTIONS', 'UNCERTAINTIES'], priority: 'question', description: 'Open questions of the author. Not checked.' },
 ];
 
 export const PRIORITY_TO_SECTION: Record<MaterialPriority, InputSection> = { verbatim: 'verbatim', must: 'must', should: 'should', may: 'may', background: 'background', avoid: 'avoid' };
@@ -158,7 +158,7 @@ export function blankOutComments(text: string): string {
 }
 
 /**
- * Parses author-input.md. Throws EditorialError for malformed frontmatter
+ * Parses author-input.md. Throws StoryOpsError for malformed frontmatter
  * (the file cannot be trusted); everything else is reported as issues.
  * An empty file is valid and yields no items.
  */
@@ -168,15 +168,15 @@ export function parseAuthorInput(source: string, options: { expectedStory?: stri
   const sourceHash = hashText(text);
   const issues: AuthorInputIssue[] = [];
   const fm = splitFrontmatter(text);
-  if (fm.error) throw new EditorialError('AUTHOR_INPUT_FRONTMATTER', `${label}: ${fm.error}`, { hint: 'Fix the block between the two "---" lines, or delete it (frontmatter is optional).' });
+  if (fm.error) throw new StoryOpsError('AUTHOR_INPUT_FRONTMATTER', `${label}: ${fm.error}`, { hint: 'Fix the block between the two "---" lines, or delete it (frontmatter is optional).' });
   let story: string | undefined;
   if (fm.data) {
     const version = fm.data.schemaVersion;
     if (version !== undefined && version !== AUTHOR_INPUT_SCHEMA_VERSION) {
-      throw new EditorialError('AUTHOR_INPUT_FRONTMATTER', `${label}: unsupported schemaVersion ${String(version)} (expected ${AUTHOR_INPUT_SCHEMA_VERSION})`);
+      throw new StoryOpsError('AUTHOR_INPUT_FRONTMATTER', `${label}: unsupported schemaVersion ${String(version)} (expected ${AUTHOR_INPUT_SCHEMA_VERSION})`);
     }
     if (fm.data.story !== undefined) {
-      if (typeof fm.data.story !== 'string') throw new EditorialError('AUTHOR_INPUT_FRONTMATTER', `${label}: "story" must be a string (the article slug)`);
+      if (typeof fm.data.story !== 'string') throw new StoryOpsError('AUTHOR_INPUT_FRONTMATTER', `${label}: "story" must be a string (the article slug)`);
       story = fm.data.story;
     }
   }
@@ -300,47 +300,4 @@ export function itemsByPriority(input: AuthorInput): Record<ItemPriority, Author
   const out = Object.fromEntries(itemPrioritySchema.options.map((p) => [p, [] as AuthorInputItem[]])) as Record<ItemPriority, AuthorInputItem[]>;
   for (const item of input.items) out[item.priority].push(item);
   return out;
-}
-
-export function authorInputTemplate(slug: string): string {
-  const parts = ['---', `schemaVersion: ${AUTHOR_INPUT_SCHEMA_VERSION}`, `story: ${slug}`, '---', '', '# Author input', '', '<!--', 'Throw in raw thoughts, phrases, anecdotes, jokes and fragments. Nothing here has to be', 'complete or formal, and no section is required: an empty file is valid.', 'One item per bullet or per paragraph (separate items with a blank line).', 'This is editorial material, not evidence: facts still come from story.json.', '-->', ''];
-  for (const def of INPUT_SECTIONS) parts.push(`## ${def.heading}`, '', `<!-- ${def.description} -->`, '');
-  return parts.join('\n');
-}
-
-/**
- * Appends an item to a section of author-input.md, keeping everything else
- * byte-for-byte. Continuation lines are indented so they stay in the item.
- */
-export function addAuthorInputItem(source: string, section: InputSection, text: string): string {
-  const clean = text.replace(/\r\n?/g, '\n').trim();
-  if (!clean) throw new EditorialError('AUTHOR_INPUT_EMPTY', 'Refusing to add an empty item.');
-  const [first, ...rest] = clean.split('\n');
-  const entry = [`- ${first}`, ...rest.map((l) => (l.trim() ? `    ${l.trim()}` : '    '))].join('\n');
-  const def = sectionDef(section);
-  const lines = source.replace(/\r\n?/g, '\n').split('\n');
-  const start = lines.findIndex((l) => {
-    const h = l.match(/^##\s+(.+?)\s*#*\s*$/);
-    return Boolean(h && HEADING_INDEX.get(normHeading(h[1]!))?.id === section);
-  });
-  if (start < 0) {
-    const base = source.replace(/\s*$/, '');
-    return `${base}${base ? '\n\n' : ''}## ${def.heading}\n\n${entry}\n`;
-  }
-  let end = lines.length;
-  for (let i = start + 1; i < lines.length; i += 1) {
-    if (/^#{1,2}\s/.test(lines[i]!)) {
-      end = i;
-      break;
-    }
-  }
-  let insertAt = end;
-  while (insertAt > start + 1 && lines[insertAt - 1]!.trim() === '') insertAt -= 1;
-  const prev = lines[insertAt - 1] ?? '';
-  // A preceding paragraph item (not a bullet, heading or comment) must stay a separate item.
-  const needsGap = insertAt === start + 1 || (!BULLET.test(prev) && !/^\s{4}/.test(prev));
-  const block = needsGap ? ['', entry] : [entry];
-  const tail = lines.slice(insertAt);
-  const out = [...lines.slice(0, insertAt), ...block, ...(tail.length && tail[0]!.trim() !== '' ? [''] : []), ...tail];
-  return out.join('\n');
 }

@@ -1,0 +1,28 @@
+# Built-in review profile. StoryOps uses it to REVIEW a human-written draft;
+# it never generates prose in this style. Copy to .storyops/review-profiles/<new-id>.yaml
+# (with a new id) to customise; no code changes are needed.
+schemaVersion: 2
+id: product-story
+version: 2.0.0
+displayName: Product story
+description: >-
+  Why a product capability exists, from the user's problem to what changed in the product, with the engineering visible but not dominant. Honest about what is and is not done; no marketing.
+expectations:
+  firstPerson: expected
+  flow: user-problem-driven
+  conflictEarly: true
+  technicalDepth: moderate
+  codeRole: sparing
+  limitations: optional
+  documentationRisk: warn
+watchFor:
+  - "Feature lists."
+  - "Adoption or user numbers without evidence."
+  - "Superlatives and promotional tone."
+publicationTypes:
+  - product-update
+  - technical-announcement
+  - short-project-update
+  - engineering-story
+notes:
+  - Expectations are review context. A finding based on them is a suggestion; the author decides.
