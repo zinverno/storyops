@@ -36,10 +36,12 @@ you write the article?" or "can you rewrite the whole article?".
 - **Topic intelligence**: opportunity reports that keep every dimension
   separate (novelty, evidence, overlap, activity, saturation, trend,
   specificity, recency), topic dossiers and side-by-side comparisons.
-- **Article review**: language (Russian first), style patterns, logic, factual
-  claims vs. repository evidence, repetition, structure, clarity, platform fit
-  and overlap with the author's archive. Read-only; findings with at most one
-  short local alternative.
+- **Article review**: selected language patterns (Russian first), style
+  patterns, logic hints, factual claims vs. repository evidence, repetition,
+  structure, clarity, platform fit and overlap with the author's archive.
+  Read-only; findings with at most one short local alternative. With the
+  `storyops-review` skill the agent adds a mandatory language/logic pass under
+  the same rules.
 
 ## What StoryOps is not
 
@@ -47,7 +49,8 @@ Not an AI article generator, not an "AI writer", not an editorial author, not
 a content-generation system. It does not draft articles or sections, write
 introductions or conclusions, complete unfinished prose, rewrite articles,
 repurpose one article into another platform, produce final copy, imitate the
-author's voice or rank topics for the author. It has no virality predictions,
+author's voice or rank topics for the author. It does not create publication
+assets (screenshots, images, covers). It has no virality predictions,
 quality scores, predicted views or engagement forecasts, and no "AI detector".
 
 ## Workflow
@@ -83,8 +86,7 @@ npm link                      # optional: puts `storyops` on your PATH
 storyops --help               # or: node dist/src/cli/index.js --help
 ```
 
-The optional screenshot utility uses Playwright (`npx playwright install
-chromium`, or `STORYOPS_CHROMIUM_PATH`). Nothing else needs a browser.
+No browser is needed.
 
 ### Agent Skills
 
@@ -92,10 +94,9 @@ chromium`, or `STORYOPS_CHROMIUM_PATH`). Nothing else needs a browser.
 | --- | --- |
 | `storyops-research` | platform research, trends, saturation, patterns, author history and coverage |
 | `storyops-opportunity` | repository inspection, events, overlap with the archive, opportunity reports, dossiers |
-| `storyops-review` | read-only review of a human-written article; never rewrites it |
-| `product-screenshots` | optional utility: product screenshots from a plan the author wrote |
+| `storyops-review` | read-only review of a human-written article (CLI report + mandatory agent language/logic pass); never rewrites it |
 
-All three StoryOps skills refuse to write articles: asked to, they answer
+All three skills refuse to write articles: asked to, they answer
 *"I can research the topic, show evidence and review a draft you write."*
 Skills follow the [Agent Skills specification](https://agentskills.io/specification).
 
@@ -326,9 +327,19 @@ Output: `reviews/<article>-<date>/review.{md,json}`. The article is read once
 and verified byte-identical afterwards; an output path that would touch the
 article is refused.
 
+**The CLI checks are deliberately limited.** The language checker is
+deterministic and covers only selected Russian spelling, punctuation and style
+patterns; logic rules are lexical hints. A CLI report is not proofreading.
+When the review runs through the `storyops-review` Agent Skill, the agent must
+follow the CLI report with a separate read-only pass for spelling, grammar,
+awkward wording, unclear references, broken transitions and logical gaps. That
+pass uses the same contract (location, possible issue, why it may matter,
+suggested direction, at most one short local alternative) and never rewrites a
+paragraph, section or article.
+
 | Category | Examples |
 | --- | --- |
-| language | канцелярит («данная система позволяет осуществлять анализ» → possible local alternative «система анализирует»), frequent misspellings, punctuation, repeated words, overlong sentences |
+| language | канцелярит («данная система позволяет осуществлять анализ» → possible local alternative «система анализирует»), selected frequent misspellings and punctuation patterns, repeated words, overlong sentences — not a full spelling or grammar check |
 | style | clichés, repeated triads, "не X, а Y" and em-dash density, generic section openings, repeated conclusions, uniform paragraph rhythm — *style findings*, never an "AI probability" |
 | logic | a statement and its negation; "гарантирует" vs "только при запуске" about the same subject (lexical heuristic) |
 | factual | claims checked against benchmarks, docs, history and modules: supported, partially-supported, unsupported, contradicted, needs-human-confirmation |
@@ -390,7 +401,7 @@ storyops topics discover | show <id> | compare <a> <b> … | list
 storyops review <article.md> | findings list | findings set <id> <status>
 storyops db status | stats | vacuum | rebuild | backup
 storyops platforms list | show | profiles list | show | validate
-storyops skills validate | install | cache list | clear | screenshots capture
+storyops skills validate | install | cache list | clear
 ```
 
 Global options: `-C <dir>`, `-c <config>`, `--json`, `-v`, `-q`,
@@ -418,7 +429,9 @@ reviews/
 └── <article>-<date>/review.{md,json}
 ```
 
-There is no generated article or draft directory.
+StoryOps writes only analytical reports, dossiers, reviews and its database.
+There is no generated article, draft or publication-asset (images,
+screenshots) directory.
 
 ## Privacy and research ethics
 
@@ -431,8 +444,7 @@ There is no generated article or draft directory.
   article text.
 - Repository analysis skips `.env`, keys, credentials and other secret-like
   paths; logs and excerpts pass through secret redaction; review excerpts are
-  short. Screenshot capture blocks DOM text that looks like secrets and
-  requires a visual review of every image.
+  short.
 
 ## Platform support
 
@@ -452,11 +464,13 @@ fabricates platform data for platforms without a live adapter.
 
 ## Limitations
 
-- Language checks are deterministic heuristics (dictionaries and patterns);
-  they do not solve grammar. Logic checks only surface lexically similar
+- Language checks are deterministic heuristics (dictionaries and patterns)
+  for selected Russian spelling, punctuation and style patterns; they are not
+  comprehensive proofreading and do not check grammar. Logic checks only surface lexically similar
   statements with opposite polarity or different guarantees. Factual checks
   compare claims with what the repository contains; they are not exhaustive.
-  The reviewing agent or the author covers the rest.
+  The `storyops-review` skill's mandatory agent pass and the author cover
+  the rest; neither is guaranteed to find every problem.
 - Topic matching is lexical (aliases, stems, hubs, tags); misclassification is
   possible. Clustering with embeddings is future work.
 - Research samples come from platform top lists and imported datasets: a
@@ -479,9 +493,10 @@ repository reports and workspace style presets, and never deletes or rewrites
 stay as user files and are not treated as published history. Analysis
 commands keep deprecated aliases (`research -p`, `gap`, `collision`,
 `continuity`, `project inspect`, `style`); generation commands (`repurpose`,
-`create`, `story`, `brief`, `evidence`, `editorial`, `input`) print why they
-were removed and do nothing. The `editorial-kit` executable remains an alias
-for one release. Details and the full component classification:
+`create`, `story`, `brief`, `evidence`, `editorial`, `input`) and
+`screenshots` (publication assets) print why they were removed and do
+nothing. The `editorial-kit` executable remains an alias for one release.
+Details and the full component classification:
 [docs/MIGRATION-v3.md](docs/MIGRATION-v3.md).
 
 ## Development
@@ -494,13 +509,12 @@ npm test            # vitest (offline; network is blocked in tests/setup.ts)
 npm run check       # lint + typecheck + build + test + skills + review profiles
 ```
 
-Tests use fixtures only. The screenshot tests start a local static server and
-need Chromium (skipped with a warning when none is found; CI requires it).
+Tests use fixtures only and need no browser.
 
 ## Deferred
 
-Automatic publishing, social posting, video, demo-vault automation, browser
-extensions, engagement prediction, external embeddings and paid APIs are out
+Automatic publishing, social posting, screenshots and other publication
+assets, video, demo-vault automation, browser extensions, engagement prediction, external embeddings and paid APIs are out
 of scope. Interactive review and embedding-based topic clustering are
 possible future work.
 

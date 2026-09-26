@@ -63,7 +63,8 @@ warning), and old config fields are accepted and ignored with warnings.
 | `collision -t` | `author overlap` / `topics compare` (alias kept, deprecated) |
 | `style <file>` | `review <file>` (alias kept, deprecated) |
 | `styles list/show/validate` | `profiles list/show/validate` (alias kept, deprecated) |
-| `story create/validate`, `brief`, `evidence`, `repurpose`, `create`, `editorial plan/validate/audit`, `input init/add/show`, `screenshots plan` | **removed** — each prints why and what to use instead, exits with code 2 and does nothing |
+| `story create/validate`, `brief`, `evidence`, `repurpose`, `create`, `editorial plan/validate/audit`, `input init/add/show` | **removed** — each prints why and what to use instead, exits with code 2 and does nothing |
+| `screenshots plan`, `screenshots capture` | **removed** — screenshots are publication assets; StoryOps is analysis-only. The command prints why, exits with code 2 and does nothing. Capture screenshots with your own tooling (e.g. Playwright directly) |
 
 ## Component classification
 
@@ -86,7 +87,7 @@ warning), and old config fields are accepted and ignored with warnings.
 | Editorial audit, dryness, originality | repurpose | article review (`src/review/*`) |
 | Author input (`author-input.md`) | repurpose | review input: MUST USE possibly missing, VERBATIM missing, DO NOT USE present |
 | Platform strategies v1 | repurpose | strategy schema v2: analysis context and review fit, no draft skeletons |
-| Screenshots capture | retain (optional utility, not expanded) | `storyops screenshots capture` from a plan the author writes |
+| Screenshots capture | remove (0.3.0) | publication assets are outside the analysis-only boundary; `storyops screenshots …` is a tombstone. The last implementation is in the git history of v2 / early v3 (`src/screenshots/`) |
 | Screenshot plans derived from stories | remove | — |
 | Canonical story (`story.json`) | remove | replaced by the topic dossier (`topics/<id>/dossier.*`) as the last artifact before writing |
 | Briefs | remove | — |
@@ -96,7 +97,7 @@ warning), and old config fields are accepted and ignored with warnings.
 | Generation CLI (`repurpose`, `create`, `brief`, `story`, `editorial`, `input`) | deprecate (tombstones) | removed in the next release |
 | Agent Skill `editorial-author` | remove (retired) | `storyops-review` covers the post-writing part |
 | Agent Skill `editorial-research` | repurpose | `storyops-research` |
-| Agent Skill `product-screenshots` | retain (optional) | no article planning |
+| Agent Skill `product-screenshots` | remove (retired) | no longer bundled or installed by `storyops skills install`; delete an installed copy yourself if you no longer need it |
 | New | — | `storyops-opportunity` skill, SQLite database, topic model, trends, opportunity discovery, review |
 
 ## Data model changes
@@ -107,5 +108,12 @@ warning), and old config fields are accepted and ignored with warnings.
 - Workspace: `.storyops/` (database, cache, research reports, author,
   repositories, reports, backups, review profiles), `topics/`, `reviews/`.
   There is no article output directory.
-- Environment: `STORYOPS_CHROMIUM_PATH`, `STORYOPS_USER_AGENT_CONTACT`,
-  `STORYOPS_LOG_LEVEL` (the `EDITORIAL_*` names are still honoured).
+- Config: the `screenshots` section is accepted with a deprecation warning and
+  ignored; `storyops migrate` drops it from `storyops.config.json`.
+- Environment: `STORYOPS_USER_AGENT_CONTACT`, `STORYOPS_LOG_LEVEL` (the
+  `EDITORIAL_*` names are still honoured). `STORYOPS_CHROMIUM_PATH` /
+  `EDITORIAL_CHROMIUM_PATH` are no longer used. Playwright is no longer a
+  dependency.
+- Review: the `storyops-review` skill adds a mandatory agent language/logic
+  pass after the CLI report; the CLI checker itself stays deterministic and
+  limited (selected Russian spelling, punctuation and style patterns).
