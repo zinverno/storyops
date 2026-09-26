@@ -21,6 +21,19 @@ The article belongs to the author. A review may point, explain and suggest.
   new version of the article.
 - Removing duplicated content on the author's behalf: report both places.
 
+## CLI checks versus the agent pass
+
+The CLI language checker is deterministic and deliberately narrow (selected
+Russian spelling, punctuation and style patterns); its logic rules are lexical
+hints. It does not claim comprehensive proofreading, grammar checking, logic
+checking or fact checking.
+
+That is why the skill requires a separate agent pass after every CLI report
+(spelling, grammar, awkward wording, unclear references, broken transitions,
+logical gaps). The agent pass follows exactly the rules above: location,
+possible issue, why it may matter, suggested direction, at most one short
+local alternative, and never a rewritten paragraph, section or article.
+
 ## Author decisions
 
 `storyops findings list` / `storyops findings set F007 dismissed --note "…"`.

@@ -61,6 +61,29 @@ describe('bundled Agent Skills', () => {
     }
   });
 
+  it('storyops-review requires a separate read-only agent language/logic pass after the CLI report', async () => {
+    const src = await readFile(path.join(ROOT, 'skills', 'storyops-review', 'SKILL.md'), 'utf8');
+    const { data, body } = parseFrontmatter(src);
+    expect(String(data.description)).toMatch(/mandatory separate agent pass/);
+    const pass = body.slice(body.indexOf('## Mandatory agent pass'));
+    expect(pass).toMatch(/^## Mandatory agent pass \(after the CLI report\)/);
+    expect(pass).toMatch(/you MUST do a separate read-only pass/);
+    for (const target of ['spelling', 'grammar', 'awkward wording', 'unclear references', 'broken transitions', 'logical gaps and contradictions']) expect(pass, target).toContain(target);
+    // Same contract as the CLI findings.
+    for (const field of ['location', 'possible issue', 'why it may matter', 'suggested direction', 'at most one short\n  local alternative']) expect(pass, field).toContain(field);
+    expect(pass).toMatch(/Never rewrite a paragraph, a section or the article/);
+    expect(pass).toMatch(/Never output a\s+corrected full text/);
+    expect(pass).toMatch(/Do not edit or save the article file/);
+    // The CLI checker's limits are stated; no claim of comprehensive proofreading.
+    expect(pass).toMatch(/deterministic and intentionally limited/);
+    expect(pass).toMatch(/selected Russian spelling, punctuation and style patterns/);
+    expect(pass).toMatch(/A CLI-only report is not proofreading/);
+    expect(pass).toMatch(/Do not claim the text is\s+error-free/);
+    const boundaries = await readFile(path.join(ROOT, 'skills', 'storyops-review', 'references', 'boundaries.md'), 'utf8');
+    expect(boundaries).toMatch(/does not claim comprehensive proofreading/);
+    expect(boundaries).toMatch(/separate agent pass after every CLI report/);
+  });
+
   it('detects invalid skills', async () => {
     const tmp = await tempDir();
     try {

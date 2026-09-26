@@ -1,6 +1,6 @@
 ---
 name: storyops-review
-description: Read-only review of an article the author wrote, with the StoryOps CLI. Reports language problems (Russian first), style patterns, logical inconsistencies, factual claims checked against repository evidence, repetition (inside the article and against the author's earlier publications), structure, clarity and platform fit, each with a location, an explanation and at most one short local alternative. Use when the author asks for feedback, proofreading, a fact check or a pre-publication review of their own draft. It never rewrites, completes, restyles or saves the article.
+description: Read-only review of an article the author wrote. Runs the deterministic StoryOps CLI review (selected language patterns, style patterns, logic hints, factual claims checked against repository evidence, repetition, structure, clarity, platform fit), then a mandatory separate agent pass for spelling, grammar, awkward wording, unclear references, broken transitions and logical gaps. Every finding has a location, an explanation and at most one short local alternative. Use when the author asks for feedback, proofreading, a fact check or a pre-publication review of their own draft. It never rewrites, completes, restyles or saves the article.
 license: MIT
 compatibility: Needs the storyops CLI (Node.js 20.19+). Works offline; --repo needs a configured repository, --platform needs earlier research runs. No paid AI APIs.
 metadata:
@@ -57,15 +57,47 @@ Possible local alternative: «система анализирует».
   fact checking. Details: [references/review-categories.md](references/review-categories.md).
 - Style findings are observable patterns (triads, "не X, а Y", em dashes,
   generic openings…). Never call them an "AI probability".
-- Logic findings from the tool are lexical hints; add your own reading of the
-  argument as separate, clearly marked observations.
 - The author decides. Record decisions with
   `storyops findings set <id> accepted|dismissed|resolved`; dismissed findings
   stay dismissed in later reviews of the same article.
 
-## Agent review on top of the tool
+## Mandatory agent pass (after the CLI report)
 
-You may add findings the heuristics cannot see (a missing step in the argument,
-an unclear guarantee, a claim that needs a source). Use the same format and
-the same limits: location, problem, why, suggestion, at most one local
-alternative. See [references/boundaries.md](references/boundaries.md).
+The CLI checker is deterministic and intentionally limited: its language rules
+cover only selected Russian spelling, punctuation and style patterns, and its
+logic rules are lexical hints. **A CLI-only report is not proofreading** and
+must never be presented as comprehensive.
+
+After reading `review.md` you MUST do a separate read-only pass over the
+author's text and look for:
+
+1. spelling;
+2. grammar;
+3. awkward wording;
+4. unclear references (what does "это", "он", "the system" point to?);
+5. broken transitions between sentences and paragraphs;
+6. logical gaps and contradictions the deterministic rules did not catch.
+
+Rules for this pass (the same review contract as the CLI):
+
+- Each finding has: **location** (line or quoted excerpt), **possible issue**,
+  **why it may matter**, **suggested direction**, and **at most one short
+  local alternative** (a word, a phrase or one short sentence).
+- Never rewrite a paragraph, a section or the article. Never output a
+  corrected full text, even when there are many small errors: list them.
+- Use the CLI labels (Possible issue / Why it may matter / Possible change /
+  Possible local alternative). Mark these findings `agent pass` so the author
+  can tell them from the CLI findings; do not repeat CLI findings.
+- Do not edit or save the article file.
+- If you find nothing in a category, say so briefly. Do not claim the text is
+  error-free.
+
+```text
+L23 · agent pass · unclear reference
+Possible issue: «Он пересчитывается при старте» — неясно, что именно: индекс или отчёт.
+Why it may matter: в предыдущем абзаце упомянуты оба.
+Possible change: назвать объект явно.
+Possible local alternative: «Индекс пересчитывается при старте».
+```
+
+Details and limits: [references/boundaries.md](references/boundaries.md).
