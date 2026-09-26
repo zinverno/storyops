@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile, stat, readdir } from 'node:fs/promi
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import type { z } from 'zod';
-import { EditorialError } from './errors.js';
+import { StoryOpsError } from './errors.js';
 
 export async function ensureDir(dir: string): Promise<void> {
   await mkdir(dir, { recursive: true });
@@ -45,13 +45,13 @@ export async function readJson<T extends z.ZodType>(file: string, schema: T): Pr
   try {
     raw = await readFile(file, 'utf8');
   } catch (error) {
-    throw new EditorialError('FILE_NOT_FOUND', `Cannot read ${file}`, { cause: error });
+    throw new StoryOpsError('FILE_NOT_FOUND', `Cannot read ${file}`, { cause: error });
   }
   let data: unknown;
   try {
     data = JSON.parse(raw);
   } catch (error) {
-    throw new EditorialError('INVALID_JSON', `${file} is not valid JSON`, { cause: error });
+    throw new StoryOpsError('INVALID_JSON', `${file} is not valid JSON`, { cause: error });
   }
   return parseWithSchema(schema, data, file);
 }
@@ -68,7 +68,7 @@ export function parseWithSchema<T extends z.ZodType>(schema: T, data: unknown, l
       .slice(0, 8)
       .map((issue) => `  - ${issue.path.join('.') || '(root)'}: ${issue.message}`)
       .join('\n');
-    throw new EditorialError('SCHEMA_VALIDATION', `${label} failed validation:\n${issues}`);
+    throw new StoryOpsError('SCHEMA_VALIDATION', `${label} failed validation:\n${issues}`);
   }
   return result.data;
 }

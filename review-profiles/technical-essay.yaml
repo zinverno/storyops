@@ -1,0 +1,27 @@
+# Built-in review profile. StoryOps uses it to REVIEW a human-written draft;
+# it never generates prose in this style. Copy to .storyops/review-profiles/<new-id>.yaml
+# (with a new id) to customise; no code changes are needed.
+schemaVersion: 2
+id: technical-essay
+version: 2.0.0
+displayName: Technical essay
+description: >-
+  An argument about an engineering idea, grounded in the author's project as evidence. The thesis leads; the project provides the concrete cases.
+expectations:
+  firstPerson: expected
+  flow: argument
+  conflictEarly: false
+  technicalDepth: moderate
+  codeRole: sparing
+  limitations: expected
+  documentationRisk: warn
+watchFor:
+  - "Opinions presented as verified facts."
+  - "Sweeping industry claims."
+  - "Rhetorical triads and aphorism chains."
+publicationTypes:
+  - engineering-story
+  - channel-longread
+  - experiment
+notes:
+  - Expectations are review context. A finding based on them is a suggestion; the author decides.

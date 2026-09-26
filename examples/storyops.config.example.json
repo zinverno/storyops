@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 2,
+  "language": "ru",
+  "author": {
+    "name": "Author Name",
+    "profiles": {
+      "habr": "https://habr.com/ru/users/USERNAME/"
+    },
+    "styleProfile": "ru-technical"
+  },
+  "projects": [
+    {
+      "id": "my-project",
+      "name": "My Project",
+      "path": "../my-project",
+      "aliases": ["myproject"],
+      "glossary": [
+        "архитектура",
+        { "term": "жизненный цикл находок", "aliases": ["finding lifecycle", "findings"], "related": ["architecture"] },
+        { "term": "квитанции сверки", "id": "reconciliation", "aliases": ["reconciliation", "receipts"], "related": ["databases"] }
+      ]
+    }
+  ],
+  "topics": [
+    { "id": "stateful-ai-tooling", "label": "Stateful AI tooling", "aliases": ["stateful agent", "agent memory", "память агента"], "parent": "ai-generic", "specificity": "technology" }
+  ],
+  "research": {
+    "cacheTtlHours": 24,
+    "defaultPlatform": "habr",
+    "requestDelayMs": 2000,
+    "concurrency": 2
+  },
+  "platforms": {
+    "habr": {
+      "enabled": true,
+      "periods": ["daily", "weekly", "monthly"],
+      "hubs": ["artificial_intelligence", "programming", "open_source"],
+      "maxArticlesPerPeriod": 30,
+      "fetchArticleBodies": true
+    },
+    "medium": { "enabled": true },
+    "linkedin": { "enabled": true },
+    "telegram": { "enabled": true },
+    "generic-blog": { "enabled": true }
+  },
+  "analysis": {
+    "windowDays": 30,
+    "saturation": { "minSample": 15, "highlySaturatedShare": 0.3, "crowdedShare": 0.15, "activeShare": 0.05 },
+    "trends": { "windowDays": 7, "minPoints": 3, "changeThreshold": 0.2 },
+    "outdatedAfterDays": 730
+  },
+  "review": {
+    "profile": "engineering-story",
+    "maxAlternativeChars": 240
+  }
+}

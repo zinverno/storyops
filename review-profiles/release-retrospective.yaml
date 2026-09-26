@@ -1,0 +1,28 @@
+# Built-in review profile. StoryOps uses it to REVIEW a human-written draft;
+# it never generates prose in this style. Copy to .storyops/review-profiles/<new-id>.yaml
+# (with a new id) to customise; no code changes are needed.
+schemaVersion: 2
+id: release-retrospective
+version: 2.0.0
+displayName: Release retrospective
+description: >-
+  A look back at a release or a period of work: what was planned, what shipped, what changed along the way and what the author learned. Organised around a few themes, not the changelog.
+expectations:
+  firstPerson: expected
+  flow: retrospective
+  conflictEarly: false
+  technicalDepth: moderate
+  codeRole: sparing
+  limitations: expected
+  documentationRisk: warn
+watchFor:
+  - "Retelling the changelog."
+  - "Presenting plans as shipped."
+  - "Metrics without measurement method."
+publicationTypes:
+  - release-retrospective
+  - product-update
+  - short-project-update
+  - engineering-story
+notes:
+  - Expectations are review context. A finding based on them is a suggestion; the author decides.

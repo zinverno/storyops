@@ -4,7 +4,7 @@ Minimal-opinion fallback for a personal site or an unknown destination.
 
 | Capability | Status |
 | --- | --- |
-| Strategy | implemented |
+| Strategy (analysis + review fit) | implemented |
 | Live trend research | not applicable |
-| Author history | manual import |
-| Renderer | default scaffold renderer |
+| Author history | manual import (`storyops author import <file> -p generic-blog`) |
+| Dataset import | yes (`storyops research import`) |

@@ -1,0 +1,29 @@
+# Built-in review profile. StoryOps uses it to REVIEW a human-written draft;
+# it never generates prose in this style. Copy to .storyops/review-profiles/<new-id>.yaml
+# (with a new id) to customise; no code changes are needed.
+schemaVersion: 2
+id: dev-diary
+version: 2.0.0
+displayName: Dev diary
+description: >-
+  A chronological, informal account of recent work on a project: smaller engineering observations, what was tried, what surprised the author. Strong personal presence, light structure.
+expectations:
+  firstPerson: expected
+  flow: chronological
+  conflictEarly: false
+  technicalDepth: moderate
+  codeRole: sparing
+  limitations: expected
+  documentationRisk: warn
+watchFor:
+  - "Formal architecture sections."
+  - "Invented day-by-day drama or effort (\"просидел всю ночь\") the author did not report."
+  - "Marketing summaries of the project."
+publicationTypes:
+  - short-project-update
+  - channel-longread
+  - technical-mini-post
+  - engineering-story
+  - product-update
+notes:
+  - Expectations are review context. A finding based on them is a suggestion; the author decides.

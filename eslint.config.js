@@ -2,7 +2,7 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'coverage/**', '.editorial/**', 'articles/**', 'editorial-demo/**'] },
+  { ignores: ['dist/**', 'node_modules/**', 'coverage/**', '.editorial/**', '.storyops/**', 'articles/**', 'editorial-demo/**', 'storyops-demo/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

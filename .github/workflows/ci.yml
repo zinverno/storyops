@@ -21,9 +21,8 @@ jobs:
       matrix:
         node: ['20', '22']
     env:
-      # Fail instead of skipping when Chromium or the build is missing, so CI
-      # always exercises the Playwright capture path and the compiled CLI.
-      EDITORIAL_REQUIRE_BROWSER: '1'
+      # Fail instead of skipping when the build is missing, so CI always
+      # exercises the compiled CLI.
       EDITORIAL_REQUIRE_BUILD: '1'
     steps:
       - uses: actions/checkout@v4
@@ -34,14 +33,5 @@ jobs:
           cache: npm
 
       - run: npm ci
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install Chromium for Playwright
-        run: npx playwright install --with-deps chromium
 
       - run: npm run check

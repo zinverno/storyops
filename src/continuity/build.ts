@@ -1,4 +1,4 @@
-import type { EditorialConfig } from '../config/schema.js';
+import type { StoryOpsConfig } from '../config/schema.js';
 import type { PublicationIndex, PublicationIndexEntry } from '../publications/index-schema.js';
 import type { Clock } from '../shared/clock.js';
 import { tokenize, unique } from '../shared/text.js';
@@ -31,7 +31,7 @@ function laterAddresses(text: string, since: string | undefined, entries: readon
   return undefined;
 }
 
-export function buildContinuity(index: PublicationIndex, config: Pick<EditorialConfig, 'author' | 'projects'>, clock: Clock): ContinuityMap {
+export function buildContinuity(index: PublicationIndex, config: Pick<StoryOpsConfig, 'author' | 'projects'>, clock: Clock): ContinuityMap {
   const entries = chronological(index.entries);
 
   const projects = config.projects.map((project) => {
@@ -120,7 +120,7 @@ export function buildContinuity(index: PublicationIndex, config: Pick<EditorialC
   };
 }
 
-/** Explained concepts for a project (or all projects) — used by briefs as "do not re-explain". */
+/** Explained concepts for a project (or all projects). */
 export function explainedConcepts(map: ContinuityMap, projectId?: string): ContinuityMap['concepts'] {
   const ids = projectId ? new Set(map.projects.find((p) => p.id === projectId)?.publicationIds ?? []) : undefined;
   return map.concepts.filter((c) => c.coverage === 'explained' && (!ids || c.occurrences.some((o) => ids.has(o.publicationId))));

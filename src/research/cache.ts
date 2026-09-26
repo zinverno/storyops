@@ -14,6 +14,9 @@ export const cacheEntrySchema = z.object({
   contentType: z.string().optional(),
   /** Final URL after redirects; the entry itself is keyed by the originally requested `url`. */
   finalUrl: z.string().optional(),
+  /** Validators for conditional re-requests (If-None-Match / If-Modified-Since). */
+  etag: z.string().optional(),
+  lastModified: z.string().optional(),
   body: z.string(),
 });
 export type CacheEntry = z.infer<typeof cacheEntrySchema>;

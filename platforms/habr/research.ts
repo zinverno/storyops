@@ -1,4 +1,4 @@
-import { EditorialError, errorMessage } from '../../src/shared/errors.js';
+import { StoryOpsError, errorMessage } from '../../src/shared/errors.js';
 import { blocksToPlainText, type ContentBlock } from '../../src/research/blocks.js';
 import type { FetchedPage } from '../../src/research/http.js';
 import type { FailureRecord, SourceRecord, TrendArticle } from '../../src/research/types.js';
@@ -6,7 +6,7 @@ import { structuralFeatures, titleFeatures } from '../../src/research/structure.
 import { estimateDepth } from '../../src/publications/depth.js';
 import { publicationSchema, type Publication } from '../../src/publications/schema.js';
 import { wordCount } from '../../src/shared/text.js';
-import type { CollectionResult, PlatformResearchAdapter, ResearchContext, TrendWindow } from '../schema.js';
+import type { CollectionResult, PlatformResearchAdapter, ResearchContext, TrendCollectionOptions, TrendWindow } from '../schema.js';
 import { HABR_ORIGIN, parseArticleList, parseArticlePage, type HabrArticlePage, type HabrListItem } from './parser.js';
 
 const PLATFORM = 'habr';
@@ -35,7 +35,7 @@ export const habrUrls = {
 export function parseHabrProfileUrl(profileUrl: string): { username: string; lang: string } {
   const m = profileUrl.match(/habr\.com\/(ru|en)\/users\/([^/?#]+)/i);
   if (!m) {
-    throw new EditorialError('HABR_PROFILE_URL', `Not a Habr profile URL: ${profileUrl}`, { hint: 'Expected https://habr.com/ru/users/<username>/' });
+    throw new StoryOpsError('HABR_PROFILE_URL', `Not a Habr profile URL: ${profileUrl}`, { hint: 'Expected https://habr.com/ru/users/<username>/' });
   }
   return { lang: m[1]!.toLowerCase(), username: m[2]! };
 }
@@ -156,7 +156,7 @@ export const habrResearch: PlatformResearchAdapter = {
     return { items: publications, sources, failures, warnings };
   },
 
-  async collectTrends(ctx, options): Promise<CollectionResult<TrendArticle> & { windows: TrendWindow[] }> {
+  async collectTrends(ctx: ResearchContext, options: TrendCollectionOptions): Promise<CollectionResult<TrendArticle> & { windows: TrendWindow[] }> {
     const periods = options.periods.filter((p) => PERIODS.has(p));
     const windows: TrendWindow[] = [];
     for (const period of periods) {
@@ -199,8 +199,11 @@ export const habrResearch: PlatformResearchAdapter = {
     }
 
     if (options.fetchArticleBodies) {
+      // Bodies whose abstract features are already stored are not downloaded again.
+      const toFetch = [...byId.values()].filter((a) => !options.knownFeatures?.has(a.id));
+      if (toFetch.length < byId.size) ctx.logger.info(`Skipping ${byId.size - toFetch.length} article bodies whose features are already stored.`);
       await Promise.all(
-        [...byId.values()].map(async (article) => {
+        toFetch.map(async (article) => {
           try {
             const page = await ctx.http.get(PLATFORM, article.url);
             sources.push(sourceOf(page, 'article'));

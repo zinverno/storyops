@@ -7,7 +7,7 @@ import type { HttpClient } from './http.js';
 import { computeMomentum, MOMENTUM_FORMULA } from './momentum.js';
 import { extractObservations, saturatedAngles } from './patterns.js';
 import { findLatestSnapshot, saveSnapshot, snapshotAgeHours } from './snapshot.js';
-import { RESEARCH_SNAPSHOT_SCHEMA_VERSION, type ResearchSnapshot, type TrendArticle } from './types.js';
+import { RESEARCH_SNAPSHOT_SCHEMA_VERSION, type ResearchSnapshot, type StructuralFeatures, type TrendArticle } from './types.js';
 
 export interface ResearchRunOptions {
   platform: PlatformModule;
@@ -20,6 +20,8 @@ export interface ResearchRunOptions {
   hubs?: string[];
   maxArticlesPerPeriod?: number;
   save?: boolean;
+  /** Stored structural features; those article bodies are not fetched again and the stored features are reused. */
+  knownFeatures?: ReadonlyMap<string, StructuralFeatures>;
 }
 
 export interface ResearchRunResult {
@@ -70,7 +72,7 @@ export async function runTrendResearch(options: ResearchRunOptions): Promise<Res
       limitations: ['live research unsupported', ...strategy.research.limitations],
       momentumFormula: MOMENTUM_FORMULA,
     };
-    logger.info(`${strategy.displayName}: live research unsupported. Stable platform strategy still applies.`);
+    logger.info(`${strategy.displayName}: live research unsupported. Import datasets with \`storyops research import\` instead.`);
     const result: ResearchRunResult = { snapshot };
     if (options.save !== false) result.files = await saveSnapshot(options.researchDir, snapshot);
     return result;
@@ -80,7 +82,7 @@ export async function runTrendResearch(options: ResearchRunOptions): Promise<Res
   try {
     collected = await platform.research.collectTrends(
       { http: options.http, logger, clock, config: platformConfig },
-      { periods, hubs, maxArticlesPerPeriod, fetchArticleBodies: platformConfig.fetchArticleBodies ?? true },
+      { periods, hubs, maxArticlesPerPeriod, fetchArticleBodies: platformConfig.fetchArticleBodies ?? true, ...(options.knownFeatures ? { knownFeatures: new Set(options.knownFeatures.keys()) } : {}) },
     );
   } catch (error) {
     return fallbackOrThrow(options, errorMessage(error));
@@ -92,6 +94,7 @@ export async function runTrendResearch(options: ResearchRunOptions): Promise<Res
   const sourceTimes = new Map<string, string>();
   for (const s of collected.sources) if (s.window) sourceTimes.set(s.window, s.fetchedAt);
   for (const a of collected.items) a.observedAt ??= sourceTimes.get(a.seenIn[0] ?? '') ?? now.toISOString();
+  for (const a of collected.items) if (!a.structure && options.knownFeatures?.has(a.id)) a.structure = options.knownFeatures.get(a.id)!;
   const { articles } = analyseArticles(collected.items, now);
   const observations = extractObservations(articles, periods.length === 1 ? periods[0]! : `combined ${periods.join('+')}`);
   const saturated = saturatedAngles(articles);
@@ -152,10 +155,10 @@ async function fallbackOrThrow(options: ResearchRunOptions, reason: string): Pro
       articles: [],
       observations: [],
       saturatedAngles: [],
-      limitations: ['Live research failed and no earlier snapshot exists. Continue with the stable platform strategy.'],
+      limitations: ['Live research failed and no earlier snapshot exists.'],
       momentumFormula: MOMENTUM_FORMULA,
     };
-    options.logger.warn(`Research failed (${reason}); no earlier snapshot available. Continuing with the stable strategy only.`);
+    options.logger.warn(`Research failed (${reason}); no earlier snapshot available. No platform data was added.`);
     return { snapshot };
   }
   const ageHours = snapshotAgeHours(previous.snapshot, options.clock.now());

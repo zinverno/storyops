@@ -6,21 +6,82 @@ import { installSkills, resolveInstallTarget, skillTargetDir } from '../src/skil
 import { validateSkill, validateSkillsDir } from '../src/skills/validate.js';
 import { ROOT, tempDir } from './helpers.js';
 
+const SKILLS = ['storyops-opportunity', 'storyops-research', 'storyops-review'];
+
 describe('bundled Agent Skills', () => {
   it('are valid per the Agent Skills specification', async () => {
     const reports = await validateSkillsDir(path.join(ROOT, 'skills'));
-    expect(reports.map((r) => r.name)).toEqual(['editorial-author', 'editorial-research', 'product-screenshots']);
+    expect(reports.map((r) => r.name)).toEqual(SKILLS);
     for (const r of reports) expect(r.issues).toEqual([]);
   });
 
   it('keep SKILL.md compact and use only spec frontmatter fields', async () => {
-    for (const name of ['editorial-author', 'editorial-research', 'product-screenshots']) {
+    for (const name of SKILLS) {
       const src = await readFile(path.join(ROOT, 'skills', name, 'SKILL.md'), 'utf8');
       const doc = parseFrontmatter(src);
       expect(Object.keys(doc.data).sort()).toEqual(['compatibility', 'description', 'license', 'metadata', 'name']);
       expect(doc.body.split('\n').length).toBeLessThan(200);
       expect(src).not.toMatch(/~\/\.claude|\.claude\/skills/); // no client-specific paths inside skill logic
     }
+  });
+
+  it('encode the product principle: StoryOps analyses, the human writes', async () => {
+    const REFUSAL = 'I can research the topic, show evidence and review a draft you write.';
+    for (const name of ['storyops-research', 'storyops-opportunity', 'storyops-review']) {
+      const src = await readFile(path.join(ROOT, 'skills', name, 'SKILL.md'), 'utf8');
+      expect(src, name).toContain(REFUSAL);
+      expect(src, name).toMatch(/The human writes|the author writes/i);
+      // No generation workflow survives in any skill.
+      expect(src, name).not.toMatch(/editorial-kit|repurpose\s+\S+\.json|story create|voice plan|draft workspace|editorial plan/i);
+    }
+    const review = await readFile(path.join(ROOT, 'skills', 'storyops-review', 'SKILL.md'), 'utf8');
+    expect(review).toMatch(/Never[\s\S]*rewrite the article/);
+    expect(review).toMatch(/Possible issue/);
+    // The imperative form appears only as the forbidden example.
+    expect(review.match(/You must rewrite/g)).toHaveLength(1);
+    expect(review).toMatch(/Never "You must rewrite this as"/);
+    const opportunity = await readFile(path.join(ROOT, 'skills', 'storyops-opportunity', 'SKILL.md'), 'utf8');
+    expect(opportunity).toMatch(/never ranks topics/i);
+    expect(opportunity).toMatch(/Never: "best topic"/);
+    const research = await readFile(path.join(ROOT, 'skills', 'storyops-research', 'SKILL.md'), 'utf8');
+    expect(research).toMatch(/Observed pattern \/ Evidence \/ Strength \/ Possible relevance/);
+    for (const name of SKILLS) {
+      for (const file of await readdir(path.join(ROOT, 'skills', name, 'references'))) {
+        const ref = await readFile(path.join(ROOT, 'skills', name, 'references', file), 'utf8');
+        expect(ref, `${name}/${file}`).not.toMatch(/editorial-kit|canonical story|story\.json|voice plan|brief\.md/i);
+      }
+    }
+  });
+
+  it('are analysis-only: no screenshot or publication-asset skill is bundled', async () => {
+    expect((await readdir(path.join(ROOT, 'skills'))).sort()).toEqual(SKILLS);
+    for (const name of SKILLS) {
+      const src = await readFile(path.join(ROOT, 'skills', name, 'SKILL.md'), 'utf8');
+      expect(src, name).not.toMatch(/screenshots capture|product-screenshots|playwright/i);
+    }
+  });
+
+  it('storyops-review requires a separate read-only agent language/logic pass after the CLI report', async () => {
+    const src = await readFile(path.join(ROOT, 'skills', 'storyops-review', 'SKILL.md'), 'utf8');
+    const { data, body } = parseFrontmatter(src);
+    expect(String(data.description)).toMatch(/mandatory separate agent pass/);
+    const pass = body.slice(body.indexOf('## Mandatory agent pass'));
+    expect(pass).toMatch(/^## Mandatory agent pass \(after the CLI report\)/);
+    expect(pass).toMatch(/you MUST do a separate read-only pass/);
+    for (const target of ['spelling', 'grammar', 'awkward wording', 'unclear references', 'broken transitions', 'logical gaps and contradictions']) expect(pass, target).toContain(target);
+    // Same contract as the CLI findings.
+    for (const field of ['location', 'possible issue', 'why it may matter', 'suggested direction', 'at most one short\n  local alternative']) expect(pass, field).toContain(field);
+    expect(pass).toMatch(/Never rewrite a paragraph, a section or the article/);
+    expect(pass).toMatch(/Never output a\s+corrected full text/);
+    expect(pass).toMatch(/Do not edit or save the article file/);
+    // The CLI checker's limits are stated; no claim of comprehensive proofreading.
+    expect(pass).toMatch(/deterministic and intentionally limited/);
+    expect(pass).toMatch(/selected Russian spelling, punctuation and style patterns/);
+    expect(pass).toMatch(/A CLI-only report is not proofreading/);
+    expect(pass).toMatch(/Do not claim the text is\s+error-free/);
+    const boundaries = await readFile(path.join(ROOT, 'skills', 'storyops-review', 'references', 'boundaries.md'), 'utf8');
+    expect(boundaries).toMatch(/does not claim comprehensive proofreading/);
+    expect(boundaries).toMatch(/separate agent pass after every CLI report/);
   });
 
   it('detects invalid skills', async () => {
@@ -45,11 +106,11 @@ describe('bundled Agent Skills', () => {
     try {
       const target = path.join(tmp.dir, 'skills-out');
       const r = await installSkills(path.join(ROOT, 'skills'), target);
-      expect(r.installed).toEqual(expect.arrayContaining(['editorial-author', 'editorial-research', 'product-screenshots']));
-      expect(await readdir(path.join(target, 'editorial-author', 'references'))).toContain('workflow.md');
+      expect(r.installed).toEqual(expect.arrayContaining(SKILLS));
+      expect(await readdir(path.join(target, 'storyops-review', 'references'))).toContain('boundaries.md');
       const again = await installSkills(path.join(ROOT, 'skills'), target);
       expect(again.installed).toEqual([]);
-      expect(again.skipped).toHaveLength(3);
+      expect(again.skipped).toHaveLength(SKILLS.length);
     } finally {
       await tmp.cleanup();
     }
@@ -89,7 +150,7 @@ describe('bundled Agent Skills', () => {
         expect(target).toBe(path.join(codexHome, 'skills'));
         const r = await installSkills(path.join(ROOT, 'skills'), target);
         expect(r.target).toBe(path.join(codexHome, 'skills'));
-        expect((await readdir(path.join(codexHome, 'skills'))).sort()).toEqual(['editorial-author', 'editorial-research', 'product-screenshots']);
+        expect((await readdir(path.join(codexHome, 'skills'))).sort()).toEqual(SKILLS);
         expect(resolveInstallTarget({ target: 'rel/skills', projectRoot: project })).toBe('/work/project/rel/skills');
       } finally {
         await tmp.cleanup();

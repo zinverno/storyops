@@ -1,6 +1,6 @@
 /**
- * Secret detection and redaction. Used by the logger, evidence collection,
- * project inspection and screenshot privacy checks.
+ * Secret detection and redaction. Used by the logger, research URL
+ * sanitising and repository inspection.
  *
  * These patterns are conservative heuristics: they reduce the chance of
  * leaking a credential, they do not prove the absence of one.

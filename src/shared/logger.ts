@@ -33,7 +33,7 @@ export interface LoggerOptions {
  * `--json` command output. All messages and data pass through secret redaction.
  */
 export function createLogger(options: LoggerOptions = {}): Logger {
-  const level = options.level ?? parseLevel(process.env.EDITORIAL_LOG_LEVEL) ?? 'info';
+  const level = options.level ?? parseLevel(process.env.STORYOPS_LOG_LEVEL ?? process.env.EDITORIAL_LOG_LEVEL) ?? 'info';
   const format = options.format ?? 'text';
   const sink =
     options.sink ??

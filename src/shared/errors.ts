@@ -1,14 +1,14 @@
 /**
- * Error type used across the toolkit. `hint` is an actionable next step for the
+ * Error type used across StoryOps. `hint` is an actionable next step for the
  * user; it is printed by the CLI and must never contain secrets.
  */
-export class EditorialError extends Error {
+export class StoryOpsError extends Error {
   readonly code: string;
   readonly hint: string | undefined;
 
   constructor(code: string, message: string, options: { hint?: string; cause?: unknown } = {}) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
-    this.name = 'EditorialError';
+    this.name = 'StoryOpsError';
     this.code = code;
     this.hint = options.hint;
   }

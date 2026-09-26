@@ -1,36 +1,23 @@
 {
   "name": "storyops",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "dependencies": {
-    "cheerio": "^1.2.0",
-    "commander": "^14.0.3",
-    "playwright": "^1.63.0",
-    "yaml": "^2.9.1",
-    "zod": "^4.6.5"
-  },
-  "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@types/node": "^26.6.2",
-    "eslint": "^10.11.0",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.70.1",
-    "vitest": "^4.1.11"
-  },
-  "description": "Evidence-backed editorial system for turning real software project history into platform-specific technical publications. Agent Skills + CLI.",
+  "description": "Technical content intelligence for authors: platform research, topic discovery, repository opportunity mining and read-only article review. StoryOps analyses; the human writes.",
   "license": "MIT",
   "engines": {
     "node": ">=20.19.0"
   },
   "bin": {
+    "storyops": "dist/src/cli/index.js",
     "editorial-kit": "dist/src/cli/index.js"
   },
   "files": [
     "dist/src",
     "dist/platforms",
+    "src/db/migrations",
     "skills",
-    "styles",
+    "review-profiles",
     "platforms/**/README.md",
     "examples",
     "fixtures",
@@ -43,15 +30,33 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run lint && npm run typecheck && npm run build && npm test && node dist/src/cli/index.js skills validate",
-    "editorial-kit": "node dist/src/cli/index.js"
+    "check": "npm run lint && npm run typecheck && npm run build && npm test && node dist/src/cli/index.js skills validate && node dist/src/cli/index.js profiles validate",
+    "storyops": "node dist/src/cli/index.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "commander": "^14.0.3",
+    "sql.js": "^1.14.2",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.2",
+    "@types/sql.js": "^1.4.11",
+    "eslint": "^10.11.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.1",
+    "vitest": "^4.1.11"
   },
   "keywords": [
     "agent-skills",
-    "editorial",
     "technical-writing",
+    "content-intelligence",
+    "topic-discovery",
+    "article-review",
+    "sqlite",
     "habr",
-    "playwright",
     "claude-code",
     "codex"
   ]

@@ -1,99 +1,84 @@
 import path from 'node:path';
 
 /**
- * Resolves the on-disk layout of an editorial workspace.
+ * On-disk layout of a StoryOps workspace.
  *
- *   .editorial/            durable author memory + volatile research state
- *   articles/<slug>/       one canonical story and all of its outputs
+ *   storyops.config.json
+ *   .storyops/storyops.db     the intelligence database (commit it or back it up)
+ *   .storyops/cache/          HTTP cache of public pages (never commit)
+ *   .storyops/research/       dated research reports (md/json)
+ *   .storyops/author/         author coverage, continuity map, profile
+ *   .storyops/repos/<id>/     repository inspection and event reports
+ *   .storyops/reports/        trend, saturation and pattern reports
+ *   .storyops/backups/        automatic database backups before migrations
+ *   topics/                   opportunity reports and topic dossiers
+ *   reviews/                  read-only review reports
+ *
+ * There is no article/draft output directory: StoryOps does not write articles.
  */
 export interface WorkspacePaths {
   root: string;
   configFile: string;
-  editorialDir: string;
+  dataDir: string;
+  dbFile: string;
+  cacheDir: string;
+  researchDir: string;
+  authorDir: string;
   authorProfileJson: string;
   authorProfileMd: string;
-  publicationsDir: string;
   publicationIndex: string;
   continuityJson: string;
   continuityMd: string;
-  researchDir: string;
-  cacheDir: string;
-  storiesIndex: string;
-  projectsDir: string;
-  articlesDir: string;
-  /** Workspace-local article style presets (Phase 2 editorial layer). */
-  stylesDir: string;
+  reposDir: string;
+  reportsDir: string;
+  backupsDir: string;
+  reviewProfilesDir: string;
+  topicsDir: string;
+  reviewsDir: string;
+  /** Legacy v2 directory (.editorial); read-only input for `storyops migrate`. */
+  legacyDir: string;
 }
 
-export function resolveWorkspace(root: string, options: { configFile?: string; editorialDir?: string; articlesDir?: string } = {}): WorkspacePaths {
+export interface WorkspaceOptions {
+  configFile?: string;
+  dataDir?: string;
+  topicsDir?: string;
+  reviewsDir?: string;
+  legacyDir?: string;
+  dbFile?: string;
+}
+
+export function resolveWorkspace(root: string, options: WorkspaceOptions = {}): WorkspacePaths {
   const absRoot = path.resolve(root);
-  const editorialDir = path.resolve(absRoot, options.editorialDir ?? '.editorial');
-  const articlesDir = path.resolve(absRoot, options.articlesDir ?? 'articles');
+  const dataDir = path.resolve(absRoot, options.dataDir ?? '.storyops');
+  const authorDir = path.join(dataDir, 'author');
   return {
     root: absRoot,
-    configFile: path.resolve(absRoot, options.configFile ?? 'editorial.config.json'),
-    editorialDir,
-    authorProfileJson: path.join(editorialDir, 'author-profile.json'),
-    authorProfileMd: path.join(editorialDir, 'author-profile.md'),
-    publicationsDir: path.join(editorialDir, 'publications'),
-    publicationIndex: path.join(editorialDir, 'publications', 'index.json'),
-    continuityJson: path.join(editorialDir, 'continuity.json'),
-    continuityMd: path.join(editorialDir, 'continuity.md'),
-    researchDir: path.join(editorialDir, 'research'),
-    cacheDir: path.join(editorialDir, 'cache'),
-    storiesIndex: path.join(editorialDir, 'stories', 'index.json'),
-    projectsDir: path.join(editorialDir, 'projects'),
-    articlesDir,
-    stylesDir: path.join(editorialDir, 'styles'),
+    configFile: path.resolve(absRoot, options.configFile ?? 'storyops.config.json'),
+    dataDir,
+    dbFile: path.resolve(absRoot, options.dbFile ?? path.join(dataDir, 'storyops.db')),
+    cacheDir: path.join(dataDir, 'cache'),
+    researchDir: path.join(dataDir, 'research'),
+    authorDir,
+    authorProfileJson: path.join(authorDir, 'author-profile.json'),
+    authorProfileMd: path.join(authorDir, 'author-profile.md'),
+    publicationIndex: path.join(authorDir, 'publication-index.json'),
+    continuityJson: path.join(authorDir, 'continuity.json'),
+    continuityMd: path.join(authorDir, 'continuity.md'),
+    reposDir: path.join(dataDir, 'repos'),
+    reportsDir: path.join(dataDir, 'reports'),
+    backupsDir: path.join(dataDir, 'backups'),
+    reviewProfilesDir: path.join(dataDir, 'review-profiles'),
+    topicsDir: path.resolve(absRoot, options.topicsDir ?? 'topics'),
+    reviewsDir: path.resolve(absRoot, options.reviewsDir ?? 'reviews'),
+    legacyDir: path.resolve(absRoot, options.legacyDir ?? '.editorial'),
   };
 }
 
-export interface ArticlePaths {
-  dir: string;
-  story: string;
-  briefMd: string;
-  briefJson: string;
-  evidenceMd: string;
-  evidenceJson: string;
-  researchDir: string;
-  imagesOriginals: string;
-  imagesOutputs: string;
-  imageManifest: string;
-  screenshotPlan: string;
-  screenshotPlanMd: string;
-  outputsDir: string;
-  /** User-authored editorial material (author-input.md). */
-  authorInput: string;
-  /** Derived editorial state (direction, pattern transfer, voice plan, audit). */
-  editorialDir: string;
-  output(platformId: string): string;
-  imageOutputs(platformId: string): string;
+export function repoDir(workspace: WorkspacePaths, repoId: string): string {
+  return path.join(workspace.reposDir, repoId);
 }
 
-export function articlePaths(workspace: WorkspacePaths, slug: string): ArticlePaths {
-  const dir = path.join(workspace.articlesDir, slug);
-  return {
-    dir,
-    story: path.join(dir, 'story.json'),
-    briefMd: path.join(dir, 'brief.md'),
-    briefJson: path.join(dir, 'brief.json'),
-    evidenceMd: path.join(dir, 'evidence.md'),
-    evidenceJson: path.join(dir, 'evidence.json'),
-    researchDir: path.join(dir, 'research'),
-    imagesOriginals: path.join(dir, 'images', 'originals'),
-    imagesOutputs: path.join(dir, 'images', 'outputs'),
-    imageManifest: path.join(dir, 'images', 'manifest.json'),
-    screenshotPlan: path.join(dir, 'screenshot-plan.json'),
-    screenshotPlanMd: path.join(dir, 'screenshot-plan.md'),
-    outputsDir: path.join(dir, 'outputs'),
-    authorInput: path.join(dir, 'author-input.md'),
-    editorialDir: path.join(dir, 'editorial'),
-    output: (platformId) => path.join(dir, 'outputs', `${platformId}.md`),
-    imageOutputs: (platformId) => path.join(dir, 'images', 'outputs', platformId),
-  };
-}
-
-/** Derives the article slug from a story file path (articles/<slug>/story.json). */
-export function slugFromStoryPath(storyPath: string): string {
-  return path.basename(path.dirname(path.resolve(storyPath)));
+export function topicDir(workspace: WorkspacePaths, topicId: string): string {
+  return path.join(workspace.topicsDir, topicId);
 }
