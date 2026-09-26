@@ -8,7 +8,6 @@ import { openDatabase } from '../db/database.js';
 import { loadMigrations } from '../db/migrate.js';
 import { gitAvailable } from '../git/git.js';
 import { loadProfileCatalog } from '../review/profiles.js';
-import { resolveChromiumExecutable } from '../screenshots/browser.js';
 import { errorMessage } from '../shared/errors.js';
 import { pathExists } from '../shared/fs.js';
 import { validateSkillsDir } from '../skills/validate.js';
@@ -26,8 +25,6 @@ export interface DoctorCheck {
 export interface DoctorOptions {
   root: string;
   configFile?: string;
-  /** Actually launch the browser (screenshots are optional). */
-  launchBrowser?: boolean;
 }
 
 function check(name: string, status: DoctorCheck['status'], message: string, hint?: string): DoctorCheck {
@@ -121,25 +118,6 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorCheck[]> 
     checks.push(errors.length ? check('skills', 'fail', errors.join('; ')) : check('skills', 'ok', `${reports.length} Agent Skill(s) valid: ${reports.map((r) => r.name).join(', ')}`));
   } catch (error) {
     checks.push(check('skills', 'warn', `could not validate bundled skills: ${errorMessage(error)}`));
-  }
-
-  try {
-    const pw = await import('playwright');
-    const exe = await resolveChromiumExecutable(config?.screenshots.browserExecutablePath);
-    const effective = exe ?? pw.chromium.executablePath();
-    if (!pathExists(effective)) checks.push(check('browser (optional)', 'warn', 'no Chromium executable found; only the optional screenshot utility needs it', 'Run `npx playwright install chromium` or set STORYOPS_CHROMIUM_PATH.'));
-    else if (options.launchBrowser) {
-      try {
-        const browser = await pw.chromium.launch({ headless: true, ...(exe ? { executablePath: exe } : {}) });
-        const version = browser.version();
-        await browser.close();
-        checks.push(check('browser (optional)', 'ok', `Chromium ${version} launched (${effective})`));
-      } catch (error) {
-        checks.push(check('browser (optional)', 'fail', `Chromium failed to launch: ${errorMessage(error).split('\n')[0]}`, 'Run `npx playwright install --with-deps chromium`.'));
-      }
-    } else checks.push(check('browser (optional)', 'ok', `Chromium executable found: ${effective} (use --browser to test a launch)`));
-  } catch {
-    checks.push(check('playwright (optional)', 'warn', 'playwright is not importable', 'Only the optional screenshot utility needs it.'));
   }
 
   checks.push(check('integrations', 'ok', `no paid AI/embedding APIs are required; none configured. ${LEGACY_CONFIG_FILE} is read only as a legacy fallback.`));

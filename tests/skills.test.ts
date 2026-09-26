@@ -6,15 +6,17 @@ import { installSkills, resolveInstallTarget, skillTargetDir } from '../src/skil
 import { validateSkill, validateSkillsDir } from '../src/skills/validate.js';
 import { ROOT, tempDir } from './helpers.js';
 
+const SKILLS = ['storyops-opportunity', 'storyops-research', 'storyops-review'];
+
 describe('bundled Agent Skills', () => {
   it('are valid per the Agent Skills specification', async () => {
     const reports = await validateSkillsDir(path.join(ROOT, 'skills'));
-    expect(reports.map((r) => r.name)).toEqual(['product-screenshots', 'storyops-opportunity', 'storyops-research', 'storyops-review']);
+    expect(reports.map((r) => r.name)).toEqual(SKILLS);
     for (const r of reports) expect(r.issues).toEqual([]);
   });
 
   it('keep SKILL.md compact and use only spec frontmatter fields', async () => {
-    for (const name of ['product-screenshots', 'storyops-opportunity', 'storyops-research', 'storyops-review']) {
+    for (const name of SKILLS) {
       const src = await readFile(path.join(ROOT, 'skills', name, 'SKILL.md'), 'utf8');
       const doc = parseFrontmatter(src);
       expect(Object.keys(doc.data).sort()).toEqual(['compatibility', 'description', 'license', 'metadata', 'name']);
@@ -43,11 +45,19 @@ describe('bundled Agent Skills', () => {
     expect(opportunity).toMatch(/Never: "best topic"/);
     const research = await readFile(path.join(ROOT, 'skills', 'storyops-research', 'SKILL.md'), 'utf8');
     expect(research).toMatch(/Observed pattern \/ Evidence \/ Strength \/ Possible relevance/);
-    for (const name of ['product-screenshots', 'storyops-opportunity', 'storyops-research', 'storyops-review']) {
+    for (const name of SKILLS) {
       for (const file of await readdir(path.join(ROOT, 'skills', name, 'references'))) {
         const ref = await readFile(path.join(ROOT, 'skills', name, 'references', file), 'utf8');
         expect(ref, `${name}/${file}`).not.toMatch(/editorial-kit|canonical story|story\.json|voice plan|brief\.md/i);
       }
+    }
+  });
+
+  it('are analysis-only: no screenshot or publication-asset skill is bundled', async () => {
+    expect((await readdir(path.join(ROOT, 'skills'))).sort()).toEqual(SKILLS);
+    for (const name of SKILLS) {
+      const src = await readFile(path.join(ROOT, 'skills', name, 'SKILL.md'), 'utf8');
+      expect(src, name).not.toMatch(/screenshots capture|product-screenshots|playwright/i);
     }
   });
 
@@ -73,11 +83,11 @@ describe('bundled Agent Skills', () => {
     try {
       const target = path.join(tmp.dir, 'skills-out');
       const r = await installSkills(path.join(ROOT, 'skills'), target);
-      expect(r.installed).toEqual(expect.arrayContaining(['product-screenshots', 'storyops-opportunity', 'storyops-research', 'storyops-review']));
+      expect(r.installed).toEqual(expect.arrayContaining(SKILLS));
       expect(await readdir(path.join(target, 'storyops-review', 'references'))).toContain('boundaries.md');
       const again = await installSkills(path.join(ROOT, 'skills'), target);
       expect(again.installed).toEqual([]);
-      expect(again.skipped).toHaveLength(4);
+      expect(again.skipped).toHaveLength(SKILLS.length);
     } finally {
       await tmp.cleanup();
     }
@@ -117,7 +127,7 @@ describe('bundled Agent Skills', () => {
         expect(target).toBe(path.join(codexHome, 'skills'));
         const r = await installSkills(path.join(ROOT, 'skills'), target);
         expect(r.target).toBe(path.join(codexHome, 'skills'));
-        expect((await readdir(path.join(codexHome, 'skills'))).sort()).toEqual(['product-screenshots', 'storyops-opportunity', 'storyops-research', 'storyops-review']);
+        expect((await readdir(path.join(codexHome, 'skills'))).sort()).toEqual(SKILLS);
         expect(resolveInstallTarget({ target: 'rel/skills', projectRoot: project })).toBe('/work/project/rel/skills');
       } finally {
         await tmp.cleanup();

@@ -52,10 +52,5 @@
   "review": {
     "profile": "engineering-story",
     "maxAlternativeChars": 240
-  },
-  "screenshots": {
-    "viewport": { "width": 1440, "height": 1000 },
-    "deviceScaleFactor": 1,
-    "outputDir": "images"
   }
 }

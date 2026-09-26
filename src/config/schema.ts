@@ -149,14 +149,8 @@ export const storyOpsConfigSchema = z.object({
     })
     .default({ maxAlternativeChars: 240 }),
   database: z.object({ file: z.string().optional() }).default({}),
-  screenshots: z
-    .object({
-      viewport: z.object({ width: z.number().int().min(320).max(3840), height: z.number().int().min(240).max(2160) }).default({ width: 1440, height: 1000 }),
-      deviceScaleFactor: z.number().min(1).max(3).default(1),
-      outputDir: z.string().default('images'),
-      browserExecutablePath: z.string().optional(),
-    })
-    .default({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1, outputDir: 'images' }),
+  /** @deprecated screenshot capture was removed (StoryOps creates no publication assets). Accepted with a warning; ignored. */
+  screenshots: z.object({}).passthrough().optional(),
   /** @deprecated v2 generation settings. Accepted with a warning; ignored. */
   editorial: z.object({ defaultStyle: z.string().optional() }).passthrough().optional(),
   paths: z
@@ -185,6 +179,9 @@ export function configDeprecations(raw: unknown): string[] {
   const editorial = r.editorial as Record<string, unknown> | undefined;
   if (editorial && Object.keys(editorial).length > 0) {
     warnings.push('config "editorial" (v2 editorial plan / style defaults) is deprecated and ignored: StoryOps no longer plans or drafts articles. Use "review.profile" to pick a review profile.');
+  }
+  if (r.screenshots !== undefined) {
+    warnings.push('config "screenshots" is deprecated and ignored: StoryOps is analysis-only and no longer captures screenshots or other publication assets.');
   }
   const paths = r.paths as Record<string, unknown> | undefined;
   if (paths && 'articlesDir' in paths) warnings.push('config "paths.articlesDir" is deprecated and ignored: StoryOps no longer creates article workspaces. Existing article folders are left untouched.');

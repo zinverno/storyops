@@ -60,6 +60,10 @@ export function migrateConfigData(raw: Record<string, unknown>): { data: Record<
     removed.push('editorial');
     if (style) data.review = { ...((data.review as object | undefined) ?? {}), profile: style };
   }
+  if ('screenshots' in data) {
+    delete data.screenshots;
+    removed.push('screenshots');
+  }
   const paths = data.paths as Record<string, unknown> | undefined;
   if (paths) {
     if ('articlesDir' in paths) {

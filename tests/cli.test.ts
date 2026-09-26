@@ -16,7 +16,7 @@ describe.skipIf(!existsSync(CLI))('storyops CLI (built)', () => {
     const help = await run('node', [CLI, '--help']);
     for (const cmd of ['research', 'trends', 'saturation', 'patterns', 'author', 'repo', 'topics', 'review', 'findings', 'db', 'migrate', 'doctor']) expect(help.stdout).toMatch(new RegExp(`\\n  ${cmd}\\b`));
     expect(help.stdout).toMatch(/StoryOps analyses\. The human writes\./);
-    for (const removed of ['repurpose', 'brief', 'story', 'editorial', 'create']) expect(help.stdout).not.toMatch(new RegExp(`\\n  ${removed}\\b`));
+    for (const removed of ['repurpose', 'brief', 'story', 'editorial', 'create', 'screenshots']) expect(help.stdout).not.toMatch(new RegExp(`\\n  ${removed}\\b`));
     const platforms = await run('node', [CLI, 'platforms', 'list']);
     expect(platforms.stdout).toMatch(/habr\s+strategy 2\.0\.0\s+live research: implemented/);
     expect(platforms.stdout).toMatch(/linkedin\s+strategy 2\.0\.0\s+live research: unsupported/);
@@ -43,10 +43,16 @@ describe.skipIf(!existsSync(CLI))('storyops CLI (built)', () => {
   it('removed generation commands warn and do nothing', async () => {
     const tmp = await tempDir();
     try {
-      for (const args of [['repurpose', 'story.json', '-p', 'habr'], ['create', '-t', 'x', '-p', 'habr'], ['brief', '-s', 'story.json', '-p', 'habr'], ['story', 'create', '-t', 'x'], ['editorial', 'plan'], ['screenshots', 'plan', '-s', 'story.json']]) {
+      for (const args of [['repurpose', 'story.json', '-p', 'habr'], ['create', '-t', 'x', '-p', 'habr'], ['brief', '-s', 'story.json', '-p', 'habr'], ['story', 'create', '-t', 'x'], ['editorial', 'plan']]) {
         const r = (await run('node', [CLI, '-C', tmp.dir, ...args]).catch((e: Failure) => e)) as Failure;
         expect(r.code, args.join(' ')).toBe(2);
         expect(r.stderr, args.join(' ')).toMatch(/deprecated and was removed: StoryOps no longer generates publication drafts/);
+      }
+      // Screenshot capture produced publication assets; it is not reachable any more.
+      for (const args of [['screenshots', 'capture', '--plan', 'plan.json'], ['screenshots', 'plan', '-s', 'story.json'], ['screenshots']]) {
+        const r = (await run('node', [CLI, '-C', tmp.dir, ...args]).catch((e: Failure) => e)) as Failure;
+        expect(r.code, args.join(' ')).toBe(2);
+        expect(r.stderr, args.join(' ')).toMatch(/deprecated and was removed: StoryOps is analysis-only and no longer creates publication assets/);
       }
       const { readdir } = await import('node:fs/promises');
       expect(await readdir(tmp.dir)).toEqual([]);

@@ -40,7 +40,7 @@ notes: []
 async function legacyWorkspace(root: string): Promise<Record<string, string>> {
   const repo = path.join(root, 'notegarden');
   await buildFixtureRepo(path.join(FIXTURES, 'projects/notegarden/history.json'), repo);
-  const config = { schemaVersion: 1, language: 'ru', author: { name: 'Demo Author', profiles: {} }, projects: [{ id: 'notegarden', name: 'Notegarden', path: './notegarden', glossary: [{ term: 'аудит', aliases: ['audit'] }] }], editorial: { defaultStyle: 'engineering-story' }, paths: { editorialDir: '.editorial', articlesDir: 'articles' } };
+  const config = { schemaVersion: 1, language: 'ru', author: { name: 'Demo Author', profiles: {} }, projects: [{ id: 'notegarden', name: 'Notegarden', path: './notegarden', glossary: [{ term: 'аудит', aliases: ['audit'] }] }], editorial: { defaultStyle: 'engineering-story' }, screenshots: { outputDir: 'images' }, paths: { editorialDir: '.editorial', articlesDir: 'articles' } };
   const files: Record<string, string> = {};
   const put = async (rel: string, content: string) => {
     await mkdir(path.dirname(path.join(root, rel)), { recursive: true });
@@ -95,8 +95,9 @@ describe('storyops migrate (v2 → v3 workspace)', () => {
     expect(cfg.schemaVersion).toBe(2);
     expect(cfg.editorial).toBeUndefined();
     expect(cfg.paths.articlesDir).toBeUndefined();
+    expect(cfg.screenshots).toBeUndefined();
     expect(cfg.review.profile).toBe('engineering-story');
-    expect(report.config.removedFields).toEqual(['editorial', 'paths.articlesDir']);
+    expect(report.config.removedFields).toEqual(['editorial', 'screenshots', 'paths.articlesDir']);
   });
 
   it('preserves author history, Habr snapshots and repository reports in the database', async () => {

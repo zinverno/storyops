@@ -29,7 +29,6 @@ import { migrateWorkspace, renderMigration } from '../workflow/migrate.js';
 import { eventsWorkflow, inspectRepoWorkflow, repoTopicsWorkflow } from '../workflow/repo.js';
 import { importDatasetWorkflow, listTopicsWorkflow, patternsWorkflow, researchHistoryWorkflow, researchPlatformWorkflow, saturationWorkflow, topicTrendWorkflow, trendsWorkflow } from '../workflow/research.js';
 import { reviewWorkflow } from '../workflow/review.js';
-import { screenshotCaptureWorkflow } from '../workflow/screenshots.js';
 import { compareWorkflow, discoverWorkflow, showWorkflow } from '../workflow/topics.js';
 
 export const VERSION = '0.3.0';
@@ -114,9 +113,8 @@ program
 program
   .command('doctor')
   .description('check Node, config, database, git, directories, platforms, review profiles and bundled skills')
-  .option('--browser', 'launch Chromium (only the optional screenshot utility needs it)')
-  .action(async (o: { browser?: boolean }) => {
-    const checks = await runDoctor({ root: root(), ...(globals().config ? { configFile: globals().config } : {}), ...(o.browser ? { launchBrowser: true } : {}) });
+  .action(async () => {
+    const checks = await runDoctor({ root: root(), ...(globals().config ? { configFile: globals().config } : {}) });
     const icon = { ok: '✓', warn: '!', fail: '✗' } as const;
     out(checks, checks.map((c) => `${icon[c.status]} ${c.name}: ${c.message}${c.hint ? `\n    → ${c.hint}` : ''}`));
     if (checks.some((c) => c.status === 'fail')) process.exitCode = 1;
@@ -679,7 +677,7 @@ cache
     out({ cleared: o.platform ?? 'all' }, `Cleared ${o.platform ?? 'all'} cache entries.`);
   });
 
-const skills = program.command('skills').description('bundled Agent Skills (storyops-research, storyops-opportunity, storyops-review, product-screenshots)');
+const skills = program.command('skills').description('bundled Agent Skills (storyops-research, storyops-opportunity, storyops-review)');
 skills
   .command('validate [dir]')
   .description('validate skills against the Agent Skills specification')
@@ -707,32 +705,6 @@ skills
     const r = await installSkills(path.join(packageRoot(), 'skills'), target, { ...(o.link ? { link: true } : {}), ...(o.force ? { force: true } : {}) });
     out(r, [`Target: ${r.target}`, ...r.installed.map((s) => `installed ${s}`), ...r.skipped.map((s) => `skipped ${s.skill}: ${s.reason}`)]);
   });
-
-const shots = program.command('screenshots').description('optional utility: capture product screenshots from a plan you wrote (Playwright)');
-shots
-  .command('capture')
-  .description('capture screenshots from a plan into images/originals/ (never overwrites originals without --replace)')
-  .requiredOption('--plan <file>', 'screenshot plan JSON (see examples/screenshot-plan.example.json)')
-  .option('--out <dir>', 'images directory')
-  .option('--replace', 'archive existing originals to originals/.history/ and recapture')
-  .option('--only <names>', 'comma-separated step names', list)
-  .action(async (o: { plan: string; out?: string; replace?: boolean; only?: string[] }) => {
-    const c = await ctx();
-    const r = await screenshotCaptureWorkflow(c, path.resolve(o.plan), { ...(o.out ? { out: o.out } : {}), ...(o.replace ? { replace: true } : {}), ...(o.only ? { only: o.only } : {}) });
-    out(r, [
-      ...r.captured.map((x) => `captured ${x.step} → ${rel(x.file)}`),
-      ...r.skipped.map((x) => `skipped ${x.step}: ${x.reason}`),
-      ...r.failed.map((x) => `FAILED ${x.step}: ${x.reason}`),
-      ...(r.captured.length ? ['', 'Visual review REQUIRED: the privacy scan reads DOM text and form values only, not pixels.', 'Look at every image, then set "visualReview": "passed" in images/manifest.json.'] : []),
-    ]);
-    if (r.failed.length) process.exitCode = 1;
-  });
-shots
-  .command('plan')
-  .description('(removed) plans were derived from canonical stories, which StoryOps no longer creates')
-  .allowUnknownOption()
-  .allowExcessArguments()
-  .action(() => tombstone('screenshots plan', 'Write the plan yourself (examples/screenshot-plan.example.json) and run `storyops screenshots capture --plan <file>`.'));
 
 program
   .command('demo')
@@ -820,8 +792,11 @@ program
   });
 
 // ------------------------------------------ removed generation commands
-function tombstone(command: string, instead: string): never {
-  process.stderr.write(`\`${command}\` is deprecated and was removed: StoryOps no longer generates publication drafts.\n${instead}\n`);
+const NO_DRAFTS = 'StoryOps no longer generates publication drafts.';
+const NO_ASSETS = 'StoryOps is analysis-only and no longer creates publication assets.';
+
+function tombstone(command: string, instead: string, reason = NO_DRAFTS): never {
+  process.stderr.write(`\`${command}\` is deprecated and was removed: ${reason}\n${instead}\n`);
   process.exit(2);
 }
 
@@ -842,6 +817,18 @@ for (const [name, instead] of REMOVED) {
     .argument('[args...]')
     .action(() => tombstone(name, instead));
 }
+program
+  .command('screenshots', { hidden: true })
+  .allowUnknownOption()
+  .allowExcessArguments()
+  .argument('[args...]')
+  .action((args: string[]) =>
+    tombstone(
+      `screenshots${args[0] ? ` ${args[0]}` : ''}`,
+      'Screenshots are publication assets; capture them with your own tooling (e.g. Playwright directly). StoryOps reports, dossiers and reviews never need them. See docs/MIGRATION-v3.md.',
+      NO_ASSETS,
+    ),
+  );
 
 if (invokedAs === 'editorial-kit') deprecated('the `editorial-kit` executable is deprecated; use `storyops`.');
 

@@ -39,11 +39,12 @@ describe('configuration', () => {
   });
 
   it('accepts a v2 (editorial-kit) config and warns about generation-only fields without breaking', async () => {
-    const legacy = { schemaVersion: 1, author: { name: 'A' }, editorial: { defaultStyle: 'engineering-story' }, paths: { editorialDir: '.editorial', articlesDir: 'articles' } };
+    const legacy = { schemaVersion: 1, author: { name: 'A' }, editorial: { defaultStyle: 'engineering-story' }, screenshots: { outputDir: 'images' }, paths: { editorialDir: '.editorial', articlesDir: 'articles' } };
     expect(() => parseConfig(legacy)).not.toThrow();
     const warnings = configDeprecations(legacy);
     expect(warnings.join('\n')).toMatch(/"editorial".*deprecated and ignored/);
     expect(warnings.join('\n')).toMatch(/paths\.articlesDir/);
+    expect(warnings.join('\n')).toMatch(/"screenshots" is deprecated and ignored/);
     expect(warnings.join('\n')).toMatch(/storyops migrate/);
     const tmp = await tempDir();
     try {
